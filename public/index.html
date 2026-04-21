@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GLM Chat Companion</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <main id="appShell" class="app-shell view-menu">
+      <aside class="menu-panel" aria-label="Menu">
+        <header class="menu-header">
+          <div>
+            <p class="eyebrow" data-i18n="charactersEyebrow">Characters</p>
+            <h1 data-i18n="menuTitle">Menu</h1>
+          </div>
+          <button id="openMenuSettingsButton" class="button menu-settings-button" type="button" data-i18n="settingsButton">Settings</button>
+        </header>
+
+        <div id="characterGrid" class="character-grid"></div>
+
+      </aside>
+
+      <div id="menuSettingsModal" class="modal-overlay" hidden>
+        <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="menuSettingsTitle">
+          <header class="modal-header">
+            <h2 id="menuSettingsTitle" data-i18n="menuSettingsTitle">Settings</h2>
+            <button id="closeMenuSettingsButton" class="button button-ghost" type="button" data-i18n="closeButton">Close</button>
+          </header>
+
+          <div class="settings-stack">
+            <label class="field">
+              <span data-i18n="fontSizeLabel">Font Size</span>
+              <input id="menuTextSizeInput" type="range" min="85" max="200" step="5" value="103" />
+            </label>
+
+            <label class="field">
+              <span data-i18n="charactersPerRowLabel">Characters Per Row</span>
+              <input id="characterColumnsInput" type="range" min="2" max="5" step="1" value="2" />
+            </label>
+
+            <label class="field">
+              <span data-i18n="colorModeLabel">Color Mode</span>
+              <div id="themeToggle" class="theme-toggle" role="group" aria-label="Color mode" data-i18n-aria-label="colorModeLabel">
+                <button class="theme-option" type="button" data-theme-value="day" data-i18n="themeDay">Day</button>
+                <button class="theme-option" type="button" data-theme-value="night" data-i18n="themeNight">Night</button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span data-i18n="languageLabel">Language</span>
+              <div id="languageToggle" class="theme-toggle" role="group" aria-label="Language" data-i18n-aria-label="languageLabel">
+                <button class="theme-option" type="button" data-language-value="english" data-i18n="languageEnglish">English</button>
+                <button class="theme-option" type="button" data-language-value="chinese" data-i18n="languageChinese">中文</button>
+              </div>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <div id="characterSettingsModal" class="modal-overlay" hidden>
+        <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="characterSettingsTitle">
+          <header class="modal-header">
+            <h2 id="characterSettingsTitle" data-i18n="characterSettingsTitle">Character Settings</h2>
+            <div class="modal-actions">
+              <button id="revertCharacterSettingsButton" class="button button-ghost" type="button" data-i18n="revertButton">Revert</button>
+              <button id="closeCharacterSettingsButton" class="button button-ghost" type="button" data-i18n="closeButton">Close</button>
+            </div>
+          </header>
+
+          <div class="settings-stack">
+            <label class="field">
+              <span data-i18n="relationshipLabel">Relationship</span>
+              <textarea
+                id="relationshipPrompt"
+                rows="5"
+                placeholder="Describe your relationship with this character."
+                data-i18n-placeholder="relationshipPlaceholder"
+              ></textarea>
+              <div id="relationshipPresetStrip" class="relationship-preset-strip"></div>
+            </label>
+
+            <label class="field">
+              <span data-i18n="firstLineLabel">First Line</span>
+              <textarea
+                id="firstLinePrompt"
+                rows="3"
+                placeholder="Write the character's first line."
+                data-i18n-placeholder="firstLinePlaceholder"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span data-i18n="characterDescriptionLabel">Character Description</span>
+              <textarea
+                id="characterDescriptionPrompt"
+                rows="6"
+                placeholder="Describe this character's personality, voice, and details."
+                data-i18n-placeholder="characterDescriptionPlaceholder"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span data-i18n="backgroundLabel">Background</span>
+              <div id="backgroundStrip" class="background-strip"></div>
+            </label>
+
+            <div class="setting-row">
+              <label class="field">
+                <span data-i18n="spriteSizeLabel">Sprite Size</span>
+                <input id="spriteScaleInput" type="range" min="80" max="220" step="5" value="100" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="dialogueSizeLabel">Dialogue Size</span>
+                <input id="dialogueHeightInput" type="range" min="28" max="52" step="2" value="38" />
+              </label>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button id="startCharacterConversationButton" class="button button-primary" type="button" data-i18n="startButton">Start</button>
+          </footer>
+        </section>
+      </div>
+
+      <div hidden>
+        <select id="modelSelect"></select>
+        <textarea id="systemPrompt"></textarea>
+        <textarea id="worldPrompt"></textarea>
+        <input id="temperatureInput" type="number" min="0" max="2" step="0.1" value="0.9" />
+        <input id="maxTokensInput" type="number" min="32" max="220" step="1" value="220" />
+      </div>
+
+      <section class="conversation-panel" aria-label="Conversation">
+        <button id="showToolbarButton" class="toolbar-show-button button button-ghost" type="button" data-i18n="showButton">Show</button>
+        <header id="conversationHeader" class="conversation-header">
+          <button id="backToMenuButton" class="button button-ghost" type="button" data-i18n="menuTitle">Menu</button>
+          <div class="conversation-title">
+            <button id="hideToolbarButton" class="toolbar-hide-button" type="button" aria-label="Hide top menu" data-i18n="hideButton" data-i18n-aria-label="hideTopMenuLabel">Hide</button>
+            <div>
+              <p class="eyebrow" data-i18n="conversationEyebrow">Conversation</p>
+              <h2 id="characterName">No character selected</h2>
+            </div>
+          </div>
+          <div class="header-actions">
+            <details class="quick-settings">
+              <summary class="button button-ghost" data-i18n="settingsButton">Settings</summary>
+              <div class="quick-settings-panel">
+                <label class="field">
+                  <span data-i18n="textSizeLabel">Text Size</span>
+                  <input id="textSizeInput" type="range" min="85" max="200" step="5" value="103" />
+                </label>
+
+                <label class="field">
+                  <span data-i18n="characterPositionLabel">Character Position</span>
+                  <input id="characterPositionInput" type="range" min="-120" max="120" step="2" value="0" />
+                </label>
+
+                <label class="field">
+                  <span data-i18n="characterSizeLabel">Character Size</span>
+                  <input id="characterSizeQuickInput" type="range" min="80" max="220" step="5" value="100" />
+                </label>
+
+                <label class="field">
+                  <span data-i18n="dialogueHeightLabel">Dialogue Height</span>
+                  <input id="dialogueHeightQuickInput" type="range" min="28" max="52" step="2" value="38" />
+                </label>
+
+                <label class="field">
+                  <span data-i18n="backgroundLabel">Background</span>
+                  <div id="backgroundQuickStrip" class="background-strip"></div>
+                </label>
+              </div>
+            </details>
+            <button id="clearChatButton" class="button button-ghost" type="button" data-i18n="clearButton">Clear</button>
+          </div>
+        </header>
+
+        <div class="character-stage">
+          <img id="characterPortrait" class="character-portrait" src="" alt="" />
+        </div>
+
+        <form id="chatForm" class="dialogue-form">
+          <textarea
+            id="dialogueBox"
+            class="dialogue-box"
+            spellcheck="true"
+            enterkeyhint="send"
+            aria-label="Dialogue"
+            data-i18n-aria-label="dialogueAriaLabel"
+          ></textarea>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="/public/app.js"></script>
+  </body>
+</html>
