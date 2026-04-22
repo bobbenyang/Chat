@@ -1,4 +1,6 @@
 const STORAGE_KEY = "novelai-chat-companion-state";
+const WAITING_FRAMES = [".", "..", "..."];
+const WAITING_FRAME_MS = 420;
 const CHINESE_EXPRESSION_ALIASES = {
   "普通": "normal",
   "正常": "normal",
@@ -183,6 +185,9 @@ const elements = {
   backToMenuButton: document.querySelector("#backToMenuButton"),
   hideToolbarButton: document.querySelector("#hideToolbarButton"),
   showToolbarButton: document.querySelector("#showToolbarButton"),
+  openConversationSettingsButton: document.querySelector("#openConversationSettingsButton"),
+  conversationSettingsModal: document.querySelector("#conversationSettingsModal"),
+  closeConversationSettingsButton: document.querySelector("#closeConversationSettingsButton"),
   clearChatButton: document.querySelector("#clearChatButton"),
   chatForm: document.querySelector("#chatForm"),
   dialogueBox: document.querySelector("#dialogueBox")
@@ -214,6 +219,9 @@ const state = {
   toolbarHidden: false,
   busy: false
 };
+
+let waitingAnimationTimer = null;
+let waitingAnimationFrame = 0;
 
 bootstrap().catch((error) => {
   updateStatus(error.message || "Startup failed.");
@@ -347,8 +355,10 @@ function bindEvents() {
   elements.backToMenuButton.addEventListener("click", () => setView("menu"));
   elements.hideToolbarButton.addEventListener("click", () => setToolbarHidden(true));
   elements.showToolbarButton.addEventListener("click", () => setToolbarHidden(false));
+  elements.openConversationSettingsButton.addEventListener("click", openConversationSettings);
+  elements.closeConversationSettingsButton.addEventListener("click", closeConversationSettings);
+  elements.conversationSettingsModal.addEventListener("pointerdown", closeConversationSettingsOnOutsideClick);
   elements.clearChatButton.addEventListener("click", clearConversation);
-  document.addEventListener("pointerdown", closeQuickSettingsOnOutsideClick);
 }
 
 async function loadCharacters() {
@@ -418,6 +428,7 @@ async function sendMessage(event) {
   conversation.draft = "";
   conversation.pendingAssistantText = "";
   setBusy(true);
+  startWaitingAnimation();
   persistState();
   renderDialogue({ scrollToEnd: true });
   updateStatus(getTranslation().statusGenerating);
@@ -435,6 +446,7 @@ async function sendMessage(event) {
       setCharacterExpression(state.selectedCharacterId, parsedReply.expression);
     }
 
+    stopWaitingAnimation({ clearText: true });
     await animateAssistantReply(parsedReply.text);
 
     conversation.messages.push({
@@ -454,6 +466,7 @@ async function sendMessage(event) {
     persistState();
     renderDialogue({ scrollToEnd: true });
   } catch (error) {
+    stopWaitingAnimation({ clearText: true });
     conversation.pendingAssistantText = "";
     setBusy(false);
     updateStatus(error.message || getTranslation().statusMessageFailed);
@@ -594,6 +607,20 @@ function closeMenuSettings() {
 function closeMenuSettingsOnOutsideClick(event) {
   if (event.target === elements.menuSettingsModal) {
     closeMenuSettings();
+  }
+}
+
+function openConversationSettings() {
+  elements.conversationSettingsModal.hidden = false;
+}
+
+function closeConversationSettings() {
+  elements.conversationSettingsModal.hidden = true;
+}
+
+function closeConversationSettingsOnOutsideClick(event) {
+  if (event.target === elements.conversationSettingsModal) {
+    closeConversationSettings();
   }
 }
 
@@ -844,17 +871,6 @@ function updateTextSize(value) {
   persistState();
 }
 
-function closeQuickSettingsOnOutsideClick(event) {
-  const quickSettings = event.target.closest(".quick-settings");
-  if (quickSettings) {
-    return;
-  }
-
-  for (const settings of document.querySelectorAll(".quick-settings[open]")) {
-    settings.removeAttribute("open");
-  }
-}
-
 function updateCharacterNotes(characterId, nextNotes) {
   if (!characterId) {
     return;
@@ -962,6 +978,31 @@ async function animateAssistantReply(text) {
     conversation.pendingAssistantText += word;
     renderDialogue({ scrollToEnd: true });
     await wait(28);
+  }
+}
+
+function startWaitingAnimation() {
+  stopWaitingAnimation({ clearText: false });
+  waitingAnimationFrame = 0;
+  updateWaitingAnimationFrame();
+  waitingAnimationTimer = setInterval(updateWaitingAnimationFrame, WAITING_FRAME_MS);
+}
+
+function updateWaitingAnimationFrame() {
+  const conversation = getSelectedConversation();
+  conversation.pendingAssistantText = WAITING_FRAMES[waitingAnimationFrame % WAITING_FRAMES.length];
+  waitingAnimationFrame += 1;
+  renderDialogue({ scrollToEnd: true });
+}
+
+function stopWaitingAnimation({ clearText = true } = {}) {
+  if (waitingAnimationTimer) {
+    clearInterval(waitingAnimationTimer);
+    waitingAnimationTimer = null;
+  }
+
+  if (clearText) {
+    getSelectedConversation().pendingAssistantText = "";
   }
 }
 

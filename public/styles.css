@@ -295,6 +295,11 @@ textarea {
   padding-right: 0.3rem;
 }
 
+#conversationSettingsModal .settings-stack {
+  overflow-y: auto;
+  padding-right: 0.3rem;
+}
+
 .button-primary {
   color: #fffaf1;
   background: var(--accent);
@@ -498,35 +503,6 @@ textarea:focus {
   gap: 0.5rem;
 }
 
-.quick-settings {
-  position: relative;
-}
-
-.quick-settings summary {
-  display: block;
-  list-style: none;
-}
-
-.quick-settings summary::-webkit-details-marker {
-  display: none;
-}
-
-.quick-settings-panel {
-  position: absolute;
-  top: calc(100% + 0.55rem);
-  right: 0;
-  z-index: 16;
-  display: grid;
-  width: min(24rem, calc(100vw - 1.5rem));
-  gap: 1.15rem;
-  padding: 1.2rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: var(--ui-font-size);
-}
-
 .character-stage {
   position: relative;
   z-index: 1;
@@ -557,8 +533,9 @@ textarea:focus {
   position: relative;
   z-index: 4;
   display: block;
+  width: min(63rem, calc(100% - 2rem));
   padding: 1rem;
-  margin-top: var(--dialogue-overlap-negative);
+  margin: var(--dialogue-overlap-negative) auto 0;
   background: linear-gradient(180deg, transparent 0%, rgba(248, 239, 227, 0.72) 48%);
 }
 
@@ -646,15 +623,6 @@ textarea:focus {
     min-height: 100vh;
   }
 
-}
-
-@media (max-width: 430px) {
-  .menu-panel,
-  .conversation-header,
-  .dialogue-form {
-    padding: 0.75rem;
-  }
-
   .conversation-header {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -665,16 +633,22 @@ textarea:focus {
 
   .header-actions {
     grid-column: 1 / -1;
-    justify-content: stretch;
+    justify-self: center;
+    justify-content: center;
+    width: min(18rem, 100%);
   }
 
-  .header-actions .button,
-  .quick-settings {
+  .header-actions .button {
     flex: 1;
   }
 
-  .quick-settings summary {
-    text-align: center;
+}
+
+@media (max-width: 430px) {
+  .menu-panel,
+  .conversation-header,
+  .dialogue-form {
+    padding: 0.75rem;
   }
 
   .setting-row {
@@ -704,40 +678,20 @@ textarea:focus {
   }
 
   .header-actions {
-    position: fixed;
-    left: 50%;
-    bottom: calc(var(--dialogue-height) + 0.85rem + env(safe-area-inset-bottom));
-    z-index: 18;
+    grid-column: 1 / -1;
+    justify-self: center;
     justify-content: center;
-    width: min(18rem, calc(100vw - 2rem));
-    transform: translateX(-50%);
+    width: min(18rem, 100%);
   }
 
-  .header-actions .button,
-  .quick-settings {
+  .header-actions .button {
     flex: 1;
-  }
-
-  .quick-settings summary,
-  .header-actions > .button {
     text-align: center;
     box-shadow: var(--shadow);
   }
 
-  .quick-settings-panel {
-    left: 50%;
-    right: auto;
-    top: auto;
-    bottom: calc(100% + 0.55rem);
-    width: min(24rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - var(--dialogue-height) - 4.75rem);
-    overflow-y: auto;
-    transform: translateX(-50%);
-  }
-
   .dialogue-form {
-    width: min(42rem, calc(100% - 3rem));
-    margin: var(--dialogue-overlap-negative) auto 0;
+    width: min(63rem, calc(100% - 3rem));
     padding: 0.75rem 0;
   }
 

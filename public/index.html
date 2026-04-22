@@ -144,38 +144,46 @@
             </div>
           </div>
           <div class="header-actions">
-            <details class="quick-settings">
-              <summary class="button button-ghost" data-i18n="settingsButton">Settings</summary>
-              <div class="quick-settings-panel">
-                <label class="field">
-                  <span data-i18n="textSizeLabel">Text Size</span>
-                  <input id="textSizeInput" type="range" min="85" max="200" step="5" value="103" />
-                </label>
-
-                <label class="field">
-                  <span data-i18n="characterPositionLabel">Character Position</span>
-                  <input id="characterPositionInput" type="range" min="-120" max="120" step="2" value="0" />
-                </label>
-
-                <label class="field">
-                  <span data-i18n="characterSizeLabel">Character Size</span>
-                  <input id="characterSizeQuickInput" type="range" min="80" max="220" step="5" value="100" />
-                </label>
-
-                <label class="field">
-                  <span data-i18n="dialogueHeightLabel">Dialogue Height</span>
-                  <input id="dialogueHeightQuickInput" type="range" min="28" max="52" step="2" value="38" />
-                </label>
-
-                <label class="field">
-                  <span data-i18n="backgroundLabel">Background</span>
-                  <div id="backgroundQuickStrip" class="background-strip"></div>
-                </label>
-              </div>
-            </details>
+            <button id="openConversationSettingsButton" class="button button-ghost" type="button" data-i18n="settingsButton">Settings</button>
             <button id="clearChatButton" class="button button-ghost" type="button" data-i18n="clearButton">Clear</button>
           </div>
         </header>
+
+        <div id="conversationSettingsModal" class="modal-overlay" hidden>
+          <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="conversationSettingsTitle">
+            <header class="modal-header">
+              <h2 id="conversationSettingsTitle" data-i18n="menuSettingsTitle">Settings</h2>
+              <button id="closeConversationSettingsButton" class="button button-ghost" type="button" data-i18n="closeButton">Close</button>
+            </header>
+
+            <div class="settings-stack">
+              <label class="field">
+                <span data-i18n="textSizeLabel">Text Size</span>
+                <input id="textSizeInput" type="range" min="85" max="200" step="5" value="103" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="characterPositionLabel">Character Position</span>
+                <input id="characterPositionInput" type="range" min="-120" max="120" step="2" value="0" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="characterSizeLabel">Character Size</span>
+                <input id="characterSizeQuickInput" type="range" min="80" max="220" step="5" value="100" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="dialogueHeightLabel">Dialogue Height</span>
+                <input id="dialogueHeightQuickInput" type="range" min="28" max="52" step="2" value="38" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="backgroundLabel">Background</span>
+                <div id="backgroundQuickStrip" class="background-strip"></div>
+              </label>
+            </div>
+          </section>
+        </div>
 
         <div class="character-stage">
           <img id="characterPortrait" class="character-portrait" src="" alt="" />
