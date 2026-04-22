@@ -204,7 +204,7 @@ const state = {
   systemPrompt: "",
   worldPrompt: "",
   temperature: 0.9,
-  maxTokens: 220,
+  maxTokens: 300,
   spriteScale: 100,
   characterPosition: 0,
   dialogueHeight: 38,
@@ -269,7 +269,7 @@ function bindEvents() {
   });
 
   elements.maxTokensInput.addEventListener("input", () => {
-    state.maxTokens = clampNumber(Number(elements.maxTokensInput.value), 32, 220, 220);
+    state.maxTokens = clampNumber(Number(elements.maxTokensInput.value), 32, 300, 300);
     persistState();
   });
 
@@ -1014,12 +1014,14 @@ function wait(ms) {
 
 function buildFullSystemPrompt() {
   const characterName = getCharacterDisplayName();
+  const userName = getUserLabel();
   const notes = getSelectedCharacterNotes();
   const characterPrompt = getSelectedCharacterPrompt();
   const expressionNames = getSelectedCharacterExpressions().map((expression) => expression.name);
 
   return [
     `You are roleplaying as ${characterName}. Stay in character, be conversational, and reply as ${characterName}. Do not write the user's next line.`,
+    buildRoleplayGuidelines(characterName, userName),
     "Keep each reply brief and chat-like: one to three short sentences. Avoid long narration, scene summaries, and descriptive prose unless the user asks for it.",
     expressionNames.length
       ? `Expression sheet available: ${expressionNames.join(", ")}.\nAt the very start of every reply, write exactly one line in this format: Expression: <exact English expression name from the sheet>. Use exactly one expression line per reply. Do not write any other Expression or Emotion labels later in the reply. The expression value must stay in English exactly as written in the sheet even when the dialogue language is Chinese. Then write the in-character reply on the following lines.`
@@ -1030,6 +1032,30 @@ function buildFullSystemPrompt() {
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function buildRoleplayGuidelines(characterName, userName) {
+  return [
+    "IMPORTANT ROLE-PLAY GUIDELINE",
+    "",
+    "Role Rules:",
+    `- The user plays as ${userName}.`,
+    `- NEVER act as, speak for, or describe the thoughts of ${userName}; leave ${userName}'s responses and thoughts entirely up to them.`,
+    `- You act as ${characterName}, and any other character that is not ${userName}.`,
+    `- Consult the provided information to understand ${characterName} as a unique entity and portray them authentically and realistically.`,
+    "",
+    "Response Rules:",
+    `- ${characterName}'s interactions are informed by the framework of their description.`,
+    "- Ensure coherency with the established lore and the chat history.",
+    "- Organically weave in descriptions of the characters and the environment.",
+    "- Ensure that characters can only know and react to what they can logically know and perceive.",
+    "- Answer OOC commands out of character.",
+    "",
+    "Plot Rules:",
+    "- Organically move the roleplay forward.",
+    `- The intentions and goals of ${characterName} are entirely independent of and may directly conflict with those of ${userName}.`,
+    `- ${userName}'s persona is imperfect and can make mistakes. Characters are allowed to confront, disagree, question, criticize, or fight ${userName}.`
+  ].join("\n");
 }
 
 function buildLanguageInstruction() {
@@ -1335,7 +1361,7 @@ function restoreState() {
     state.systemPrompt = parsed.systemPrompt || "";
     state.worldPrompt = parsed.worldPrompt || "";
     state.temperature = parsed.temperature || 0.9;
-    state.maxTokens = clampNumber(Number(parsed.maxTokens), 32, 220, 220);
+    state.maxTokens = clampNumber(Number(parsed.maxTokens), 32, 300, 300);
     state.spriteScale = clampNumber(Number(parsed.spriteScale), 80, 220, 100);
     state.characterPosition = clampNumber(Number(parsed.characterPosition), -120, 120, 0);
     state.dialogueHeight = clampNumber(Number(parsed.dialogueHeight), 28, 52, 38);
