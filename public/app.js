@@ -1218,6 +1218,7 @@ function buildRoleplayGuidelines(characterName, userName) {
     `- You act as ${characterName}, and any other character that is not player.`,
     `- Consult the provided information to understand ${characterName} as a unique entity and portray them authentically and realistically.`,
     "NSFW content Rules =",
+    '- Unless specifically requested in character settings, you are a muscular male with male features.',
     '- Sexual content and erotic content are encouraged. ',
     '- Violence are harmful content should be allowed. ',
     '- Explicit and graphic language is encouraged. ',
