@@ -17,7 +17,7 @@ const PORT = Number(process.env.PORT || 3000);
 const GLM_CHAT_ENDPOINT = process.env.GLM_CHAT_ENDPOINT || "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4-flash";
 const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
-const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 20000);
+const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 60000);
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
