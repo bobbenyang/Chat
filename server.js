@@ -17,6 +17,7 @@ const PORT = Number(process.env.PORT || 3000);
 const GLM_CHAT_ENDPOINT = process.env.GLM_CHAT_ENDPOINT || "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4.7-flash";
 const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
+const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 20000);
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -157,7 +158,7 @@ async function streamChatReply(body, res) {
   }
   chatMessages.push(...messages);
 
-  const response = await fetchWithTimeout(GLM_CHAT_ENDPOINT, {
+  const response = await fetchStreamWithConnectTimeout(GLM_CHAT_ENDPOINT, {
     method: "POST",
     headers: createGlmHeaders(apiKey),
     body: JSON.stringify({
@@ -488,6 +489,31 @@ async function fetchWithTimeout(url, options) {
     throw error;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function fetchStreamWithConnectTimeout(url, options) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, GLM_STREAM_CONNECT_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error.name === "AbortError") {
+      throw createHttpError(
+        504,
+        `GLM stream connection timed out after ${GLM_STREAM_CONNECT_TIMEOUT_MS} ms.`
+      );
+    }
+    throw error;
   }
 }
 
