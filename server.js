@@ -112,6 +112,9 @@ async function generateChatReply(body) {
     body: JSON.stringify({
       model: model || GLM_DEFAULT_MODEL,
       messages: chatMessages,
+      thinking: {
+        type: "disabled"
+      },
       max_tokens: maxTokens,
       temperature,
       top_p: topP,
