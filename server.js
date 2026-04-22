@@ -58,7 +58,8 @@ createServer(async (req, res) => {
       console.log(`[${new Date().toISOString()}] POST /api/chat`);
       const body = await readJsonBody(req);
       validateChatRequest(body);
-      return streamChatReply(body, res);
+      await streamChatReply(body, res);
+      return;
     }
 
     if (url.pathname === "/api/characters" && req.method === "GET") {
@@ -75,7 +76,8 @@ createServer(async (req, res) => {
       return sendJson(res, 405, { error: "Method not allowed." });
     }
 
-    return serveStatic(url.pathname, res, isHead);
+    await serveStatic(url.pathname, res, isHead);
+    return;
   } catch (error) {
     const status = error.statusCode || 500;
     console.error(
