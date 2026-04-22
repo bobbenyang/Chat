@@ -1,6 +1,7 @@
 const STORAGE_KEY = "novelai-chat-companion-state";
 const WAITING_FRAMES = [".", "..", "..."];
 const WAITING_FRAME_MS = 420;
+const MAX_CONTEXT_MESSAGES = 24;
 const CHINESE_EXPRESSION_ALIASES = {
   "普通": "normal",
   "正常": "normal",
@@ -434,20 +435,31 @@ async function sendMessage(event) {
   updateStatus(getTranslation().statusGenerating);
 
   try {
-    const payload = await postJson("/api/chat", {
+    let streamedReply = "";
+    const reply = await postStreamingChat("/api/chat", {
       model: state.model,
       systemPrompt: buildFullSystemPrompt(),
-      messages: conversation.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+      messages: buildRequestMessages(conversation.messages),
       temperature: state.temperature,
       maxTokens: state.maxTokens
+    }, (text) => {
+      if (waitingAnimationTimer) {
+        stopWaitingAnimation({ clearText: true });
+      }
+
+      streamedReply += text;
+      conversation.pendingAssistantText = streamedReply;
+      renderDialogue({ scrollToEnd: true });
     });
-    const parsedReply = parseExpressionReply(payload.reply);
+
+    stopWaitingAnimation({ clearText: false });
+    const parsedReply = parseExpressionReply(reply);
     if (parsedReply.expression) {
       setCharacterExpression(state.selectedCharacterId, parsedReply.expression);
     }
 
-    stopWaitingAnimation({ clearText: true });
-    await animateAssistantReply(parsedReply.text);
+    conversation.pendingAssistantText = parsedReply.text;
+    renderDialogue({ scrollToEnd: true });
 
     conversation.messages.push({
       role: "assistant",
@@ -459,9 +471,7 @@ async function sendMessage(event) {
     setBusy(false);
 
     updateStatus(
-      payload.endpoint === "completions"
-        ? getTranslation().statusGeneratedFallback
-        : getTranslation().statusGeneratedChat
+      getTranslation().statusGeneratedChat
     );
     persistState();
     renderDialogue({ scrollToEnd: true });
@@ -1034,6 +1044,12 @@ function buildFullSystemPrompt() {
     .join("\n\n");
 }
 
+function buildRequestMessages(messages) {
+  return messages
+    .slice(-MAX_CONTEXT_MESSAGES)
+    .map(({ role, content: messageContent }) => ({ role, content: messageContent }));
+}
+
 function buildRoleplayGuidelines(characterName, userName) {
   return [
     "IMPORTANT ROLE-PLAY GUIDELINE",
@@ -1415,4 +1431,69 @@ async function postJson(url, payload) {
     throw new Error(data.error || "Request failed.");
   }
   return data;
+}
+
+async function postStreamingChat(url, payload, onChunk) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  if (!response.body) {
+    const text = await response.text();
+    if (text) {
+      onChunk(text);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let reply = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    const text = decoder.decode(value, { stream: true });
+    if (text) {
+      reply += text;
+      onChunk(text);
+    }
+  }
+
+  const tail = decoder.decode();
+  if (tail) {
+    reply += tail;
+    onChunk(tail);
+  }
+
+  if (!reply.trim()) {
+    throw new Error("GLM returned an empty response.");
+  }
+
+  return reply;
+}
+
+async function readErrorMessage(response) {
+  const text = await response.text();
+  if (!text) {
+    return "Request failed.";
+  }
+
+  try {
+    const data = JSON.parse(text);
+    return data.error || text;
+  } catch {
+    return text;
+  }
 }

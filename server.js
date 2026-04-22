@@ -16,7 +16,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 const GLM_CHAT_ENDPOINT = process.env.GLM_CHAT_ENDPOINT || "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4.7-flash";
-const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 30000);
+const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -57,8 +57,7 @@ createServer(async (req, res) => {
       console.log(`[${new Date().toISOString()}] POST /api/chat`);
       const body = await readJsonBody(req);
       validateChatRequest(body);
-      const reply = await generateChatReply(body);
-      return sendJson(res, 200, reply);
+      return streamChatReply(body, res);
     }
 
     if (url.pathname === "/api/characters" && req.method === "GET") {
@@ -139,6 +138,74 @@ async function generateChatReply(body) {
     502,
     `GLM returned a chat response without assistant text. Raw shape: ${summarizePayload(payload)}`
   );
+}
+
+async function streamChatReply(body, res) {
+  const {
+    messages,
+    model,
+    systemPrompt = "",
+    maxTokens = 300,
+    temperature = 0.9,
+    topP = 0.9
+  } = body;
+  const apiKey = getGlmApiKey();
+
+  const chatMessages = [];
+  if (systemPrompt.trim()) {
+    chatMessages.push({ role: "system", content: systemPrompt.trim() });
+  }
+  chatMessages.push(...messages);
+
+  const response = await fetchWithTimeout(GLM_CHAT_ENDPOINT, {
+    method: "POST",
+    headers: createGlmHeaders(apiKey),
+    body: JSON.stringify({
+      model: model || GLM_DEFAULT_MODEL,
+      messages: chatMessages,
+      thinking: {
+        type: "disabled"
+      },
+      max_tokens: maxTokens,
+      temperature,
+      top_p: topP,
+      stream: true
+    })
+  });
+
+  if (!response.ok) {
+    const payload = await parseResponseBody(response);
+    throw createHttpError(response.status, describeApiError(payload, "GLM chat completion failed."));
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "X-Accel-Buffering": "no"
+  });
+
+  if (!response.body) {
+    const payload = await parseResponseBody(response);
+    res.end(extractAssistantText(payload));
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    for await (const chunk of response.body) {
+      buffer += decoder.decode(chunk, { stream: true });
+      buffer = writeSseTextEvents(buffer, res);
+    }
+
+    buffer += decoder.decode();
+    writeSseTextEvents(`${buffer}\n\n`, res);
+    res.end();
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] GLM stream failed: ${error.stack || error.message || error}`);
+    res.destroy(error);
+  }
 }
 
 async function fetchModels() {
@@ -533,6 +600,57 @@ function extractAssistantText(payload) {
   return "";
 }
 
+function extractAssistantChunkText(payload) {
+  if (!payload) {
+    return "";
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map(extractAssistantChunkText).join("");
+  }
+
+  if (typeof payload === "string") {
+    return payload;
+  }
+
+  if (typeof payload.output === "string") {
+    return payload.output;
+  }
+
+  if (Array.isArray(payload.output)) {
+    return payload.output.join("");
+  }
+
+  if (typeof payload.text === "string") {
+    return payload.text;
+  }
+
+  if (Array.isArray(payload.choices) && payload.choices.length > 0) {
+    const choice = payload.choices[0];
+    if (typeof choice.delta?.content === "string") {
+      return choice.delta.content;
+    }
+
+    if (Array.isArray(choice.delta?.content)) {
+      return choice.delta.content.map(extractContentPartText).join("");
+    }
+
+    if (typeof choice.message?.content === "string") {
+      return choice.message.content;
+    }
+
+    if (Array.isArray(choice.message?.content)) {
+      return choice.message.content.map(extractContentPartText).join("");
+    }
+
+    if (typeof choice.text === "string") {
+      return choice.text;
+    }
+  }
+
+  return "";
+}
+
 function extractContentPartText(part) {
   if (typeof part === "string") {
     return part;
@@ -547,6 +665,45 @@ function extractContentPartText(part) {
   }
 
   return "";
+}
+
+function writeSseTextEvents(buffer, res) {
+  let rest = buffer;
+
+  while (rest) {
+    const separator = rest.match(/\r?\n\r?\n/);
+    if (!separator) {
+      return rest;
+    }
+
+    const rawEvent = rest.slice(0, separator.index);
+    rest = rest.slice(separator.index + separator[0].length);
+    const data = readSseEventData(rawEvent);
+    if (!data || data === "[DONE]") {
+      continue;
+    }
+
+    try {
+      const event = JSON.parse(data);
+      const text = extractAssistantChunkText(event);
+      if (text) {
+        res.write(text);
+      }
+    } catch {
+      res.write(data);
+    }
+  }
+
+  return rest;
+}
+
+function readSseEventData(rawEvent) {
+  return rawEvent
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n")
+    .trimEnd();
 }
 
 function describeApiError(payload, fallbackMessage) {
