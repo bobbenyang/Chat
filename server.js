@@ -111,17 +111,14 @@ async function generateChatReply(body) {
   const response = await fetchWithTimeout(GLM_CHAT_ENDPOINT, {
     method: "POST",
     headers: createGlmHeaders(apiKey),
-    body: JSON.stringify({
-      model: model || GLM_DEFAULT_MODEL,
+    body: JSON.stringify(createChatRequestBody({
+      model,
       messages: chatMessages,
-      thinking: {
-        type: "disabled"
-      },
-      max_tokens: maxTokens,
+      maxTokens,
       temperature,
-      top_p: topP,
+      topP,
       stream: false
-    })
+    }))
   });
 
   const payload = await parseResponseBody(response);
@@ -163,17 +160,14 @@ async function streamChatReply(body, res) {
   const response = await fetchStreamWithConnectTimeout(GLM_CHAT_ENDPOINT, {
     method: "POST",
     headers: createGlmHeaders(apiKey),
-    body: JSON.stringify({
-      model: model || GLM_DEFAULT_MODEL,
+    body: JSON.stringify(createChatRequestBody({
+      model,
       messages: chatMessages,
-      thinking: {
-        type: "disabled"
-      },
-      max_tokens: maxTokens,
+      maxTokens,
       temperature,
-      top_p: topP,
+      topP,
       stream: true
-    })
+    }))
   });
 
   if (!response.ok) {
@@ -461,19 +455,53 @@ async function serveStatic(requestPath, res, isHead = false) {
 }
 
 function createGlmHeaders(apiKey) {
-  return {
+  const headers = {
     "Authorization": `Bearer ${apiKey}`,
     "Content-Type": "application/json"
   };
+
+  if (isOpenRouterEndpoint()) {
+    if (process.env.OPENROUTER_SITE_URL) {
+      headers["HTTP-Referer"] = process.env.OPENROUTER_SITE_URL;
+    }
+    if (process.env.OPENROUTER_APP_NAME) {
+      headers["X-OpenRouter-Title"] = process.env.OPENROUTER_APP_NAME;
+    }
+  }
+
+  return headers;
 }
 
 function getGlmApiKey({ throwIfMissing = true } = {}) {
-  const apiKey = process.env.GLM_API_KEY || process.env.GLM_API;
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.GLM_API_KEY || process.env.GLM_API;
   if (!apiKey && throwIfMissing) {
-    throw createHttpError(500, "GLM_API_KEY is not set on the local server. GLM_API is also accepted.");
+    throw createHttpError(500, "API key is not set. OPENROUTER_API_KEY, GLM_API_KEY, or GLM_API is required.");
   }
 
   return apiKey;
+}
+
+function createChatRequestBody({ model, messages, maxTokens, temperature, topP, stream }) {
+  const payload = {
+    model: model || GLM_DEFAULT_MODEL,
+    messages,
+    max_tokens: maxTokens,
+    temperature,
+    top_p: topP,
+    stream
+  };
+
+  if (!isOpenRouterEndpoint()) {
+    payload.thinking = {
+      type: "disabled"
+    };
+  }
+
+  return payload;
+}
+
+function isOpenRouterEndpoint() {
+  return GLM_CHAT_ENDPOINT.includes("openrouter.ai");
 }
 
 async function fetchWithTimeout(url, options) {
