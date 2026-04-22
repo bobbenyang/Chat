@@ -328,6 +328,22 @@ textarea {
   gap: 0.75rem;
 }
 
+.history-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.visually-hidden-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .relationship-preset-strip {
   display: grid;
   grid-auto-flow: column;
@@ -544,12 +560,17 @@ textarea:focus {
   height: min(var(--dialogue-height), 24rem);
   resize: none;
   overflow-y: auto;
-  scrollbar-width: none;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 74, 46, 0.64) transparent;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   border: 2px solid rgba(113, 74, 46, 0.64);
   outline: 3px solid rgba(123, 79, 45, 0.24);
   outline-offset: -6px;
   border-radius: 8px;
-  padding: 1.1rem;
+  padding: 1.1rem 1rem 1.75rem 1.1rem;
   background: var(--surface);
   box-shadow: var(--shadow), 0 0 0 1px rgba(33, 25, 21, 0.1);
   font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
@@ -558,26 +579,21 @@ textarea:focus {
 }
 
 .dialogue-box::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.dialogue-box.is-scrolling {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(113, 74, 46, 0.64) transparent;
-}
-
-.dialogue-box.is-scrolling::-webkit-scrollbar {
   width: 0.45rem;
+  height: 0.45rem;
 }
 
-.dialogue-box.is-scrolling::-webkit-scrollbar-thumb {
+.dialogue-box::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(113, 74, 46, 0.64);
 }
 
-.dialogue-box.is-scrolling::-webkit-scrollbar-track {
+.dialogue-box::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.dialogue-box.is-scrolling {
+  scrollbar-color: rgba(113, 74, 46, 0.64) transparent;
 }
 
 .button {
@@ -652,6 +668,10 @@ textarea:focus {
   }
 
   .setting-row {
+    grid-template-columns: 1fr;
+  }
+
+  .history-actions {
     grid-template-columns: 1fr;
   }
 }

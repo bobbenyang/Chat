@@ -1,4 +1,5 @@
 const STORAGE_KEY = "novelai-chat-companion-state";
+const HISTORY_EXPORT_VERSION = 2;
 const WAITING_FRAMES = [".", "..", "..."];
 const WAITING_FRAME_MS = 420;
 const MAX_CONTEXT_MESSAGES = 24;
@@ -69,6 +70,9 @@ const TRANSLATIONS = {
     characterSizeLabel: "Character Size",
     dialogueHeightLabel: "Dialogue Height",
     clearButton: "Clear",
+    historyLabel: "History File",
+    exportHistoryButton: "Export History",
+    importHistoryButton: "Import History",
     dialogueAriaLabel: "Dialogue",
     connectToLoadModels: "Connect to load models",
     noCharacterSelected: "No character selected",
@@ -83,7 +87,10 @@ const TRANSLATIONS = {
     statusGeneratedFallback: "Reply generated.",
     statusGeneratedChat: "Reply generated via GLM chat endpoint.",
     statusMessageFailed: "Message generation failed.",
-    statusConversationCleared: "Conversation cleared."
+    statusConversationCleared: "Conversation cleared.",
+    statusHistoryExported: "History file exported.",
+    statusHistoryImported: "History file imported.",
+    statusHistoryImportFailed: "Could not import that history file."
   },
   chinese: {
     htmlLang: "zh-CN",
@@ -131,6 +138,9 @@ const TRANSLATIONS = {
     characterSizeLabel: "角色大小",
     dialogueHeightLabel: "对话框高度",
     clearButton: "清空",
+    historyLabel: "历史文件",
+    exportHistoryButton: "导出历史",
+    importHistoryButton: "导入历史",
     dialogueAriaLabel: "对话",
     connectToLoadModels: "连接后加载模型",
     noCharacterSelected: "未选择角色",
@@ -145,7 +155,10 @@ const TRANSLATIONS = {
     statusGeneratedFallback: "已生成回复。",
     statusGeneratedChat: "已通过 GLM chat 接口生成回复。",
     statusMessageFailed: "消息生成失败。",
-    statusConversationCleared: "对话已清空。"
+    statusConversationCleared: "对话已清空。",
+    statusHistoryExported: "历史文件已导出。",
+    statusHistoryImported: "历史文件已导入。",
+    statusHistoryImportFailed: "无法导入该历史文件。"
   }
 };
 
@@ -190,6 +203,9 @@ const elements = {
   conversationSettingsModal: document.querySelector("#conversationSettingsModal"),
   closeConversationSettingsButton: document.querySelector("#closeConversationSettingsButton"),
   clearChatButton: document.querySelector("#clearChatButton"),
+  exportHistoryButton: document.querySelector("#exportHistoryButton"),
+  importHistoryButton: document.querySelector("#importHistoryButton"),
+  historyFileInput: document.querySelector("#historyFileInput"),
   chatForm: document.querySelector("#chatForm"),
   dialogueBox: document.querySelector("#dialogueBox")
 };
@@ -360,6 +376,12 @@ function bindEvents() {
   elements.closeConversationSettingsButton.addEventListener("click", closeConversationSettings);
   elements.conversationSettingsModal.addEventListener("pointerdown", closeConversationSettingsOnOutsideClick);
   elements.clearChatButton.addEventListener("click", clearConversation);
+  elements.exportHistoryButton.addEventListener("click", exportHistoryFile);
+  elements.importHistoryButton.addEventListener("click", () => {
+    elements.historyFileInput.value = "";
+    elements.historyFileInput.click();
+  });
+  elements.historyFileInput.addEventListener("change", importHistoryFile);
 }
 
 async function loadCharacters() {
@@ -491,6 +513,149 @@ function clearConversation() {
   persistState();
   renderDialogue({ scrollToEnd: false });
   updateStatus(getTranslation().statusConversationCleared);
+}
+
+function exportHistoryFile() {
+  syncDraftFromDialogue();
+  persistState();
+
+  const character = getSelectedCharacter();
+  const conversation = getSelectedConversation();
+  const openingLine = getOpeningLine();
+  const payload = {
+    app: "glm-chat-companion",
+    version: HISTORY_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    character: character
+      ? {
+          id: character.id,
+          name: getCharacterName(character)
+        }
+      : null,
+    openingLine,
+    messages: conversation.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp || null
+    })),
+    draft: conversation.draft,
+    transcript: buildDialogueText()
+  };
+
+  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = buildHistoryFilename(character);
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  updateStatus(getTranslation().statusHistoryExported);
+}
+
+async function importHistoryFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const payload = JSON.parse(await file.text());
+    stopWaitingAnimation({ clearText: true });
+    applyImportedHistory(payload);
+    setBusy(false);
+    persistState();
+    render();
+    closeConversationSettings();
+    updateStatus(getTranslation().statusHistoryImported);
+  } catch (error) {
+    console.error(error);
+    window.alert(getTranslation().statusHistoryImportFailed);
+    updateStatus(getTranslation().statusHistoryImportFailed);
+  } finally {
+    elements.historyFileInput.value = "";
+  }
+}
+
+function applyImportedHistory(payload) {
+  if (isFocusedHistoryPayload(payload)) {
+    applyFocusedHistory(payload);
+    return;
+  }
+
+  if (isPlainObject(payload?.state)) {
+    applyPersistedState(payload.state);
+    return;
+  }
+
+  if (isPlainObject(payload) && (isPlainObject(payload.characterConversations) || Array.isArray(payload.messages))) {
+    applyPersistedState(payload);
+    return;
+  }
+
+  throw new Error("Invalid history file.");
+}
+
+function isFocusedHistoryPayload(payload) {
+  return isPlainObject(payload)
+    && payload.app === "glm-chat-companion"
+    && isPlainObject(payload.character)
+    && Array.isArray(payload.messages);
+}
+
+function applyFocusedHistory(payload) {
+  const characterId = typeof payload.character.id === "string" ? payload.character.id : state.selectedCharacterId;
+  if (!characterId) {
+    throw new Error("Focused history file is missing a character id.");
+  }
+
+  const messages = payload.messages
+    .map(normalizeImportedMessage)
+    .filter(Boolean);
+  const conversation = getCharacterConversation(characterId);
+  conversation.messages = messages;
+  conversation.draft = typeof payload.draft === "string" ? payload.draft : "";
+  conversation.pendingAssistantText = "";
+
+  if (typeof payload.openingLine === "string" && payload.openingLine.trim()) {
+    const notes = state.characterNotes[characterId] || {};
+    state.characterNotes[characterId] = {
+      ...notes,
+      firstLine: payload.openingLine.trim()
+    };
+  }
+
+  state.selectedCharacterId = characterId;
+  state.view = "conversation";
+}
+
+function normalizeImportedMessage(message) {
+  if (!isPlainObject(message)) {
+    return null;
+  }
+
+  const role = message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : "";
+  if (!role || typeof message.content !== "string") {
+    return null;
+  }
+
+  return {
+    role,
+    content: message.content,
+    timestamp: typeof message.timestamp === "string" ? message.timestamp : null
+  };
+}
+
+function buildHistoryFilename(character) {
+  const characterName = character ? getCharacterName(character) : "chat";
+  const date = new Date().toISOString().slice(0, 10);
+  const safeName = characterName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "chat";
+
+  return `${safeName}-history-${date}.json`;
 }
 
 function render() {
@@ -912,7 +1077,6 @@ function renderDialogue({ scrollToEnd = false } = {}) {
 
   if (scrollToEnd) {
     moveCaretToDialogueEnd();
-    elements.dialogueBox.scrollTop = elements.dialogueBox.scrollHeight;
   } else {
     elements.dialogueBox.scrollTop = 0;
   }
@@ -928,13 +1092,11 @@ function buildDialoguePrefix() {
   const conversation = getSelectedConversation();
   const turns = [];
 
-  if (conversation.messages.length === 0) {
-    turns.push(`${characterName}: ${getSelectedCharacterFirstLine() || getTranslation().openingLine}`);
-  } else {
-    for (const message of conversation.messages) {
-      const speaker = message.role === "user" ? userLabel : characterName;
-      turns.push(`${speaker}: ${message.content}`);
-    }
+  turns.push(`${characterName}: ${getOpeningLine()}`);
+
+  for (const message of conversation.messages) {
+    const speaker = message.role === "user" ? userLabel : characterName;
+    turns.push(`${speaker}: ${message.content}`);
   }
 
   if (state.busy) {
@@ -975,6 +1137,12 @@ function syncDraftFromDialogue() {
 function moveCaretToDialogueEnd() {
   const end = elements.dialogueBox.value.length;
   elements.dialogueBox.setSelectionRange(end, end);
+  scrollDialogueToEnd();
+  requestAnimationFrame(scrollDialogueToEnd);
+}
+
+function scrollDialogueToEnd() {
+  elements.dialogueBox.scrollTop = elements.dialogueBox.scrollHeight;
 }
 
 async function animateAssistantReply(text) {
@@ -1046,19 +1214,9 @@ function buildRoleplayGuidelines(characterName, userName) {
   return [
     "IMPORTANT ROLE-PLAY GUIDELINE",
     "Role Rules:",
-    `- The user plays as ${userName}.`,
-    `- NEVER act as, speak for, or describe the thoughts of ${userName}; leave ${userName}'s responses and thoughts entirely up to them.`,
-    `- You act as ${characterName}, and any other character that is not ${userName}.`,
+    `- NEVER act as, speak for, or describe the thoughts of the players; leave player's responses and thoughts entirely up to them.`,
+    `- You act as ${characterName}, and any other character that is not player.`,
     `- Consult the provided information to understand ${characterName} as a unique entity and portray them authentically and realistically.`,
-    "Response Rules:",
-    `- ${characterName}'s interactions are informed by the framework of their description.`,
-    "- Ensure coherency with the established lore and the chat history.",
-    "- Organically weave in descriptions of the characters and the environment.",
-    "- Ensure that characters can only know and react to what they can logically know and perceive.",
-    "Plot Rules:",
-    "- Organically move the roleplay forward.",
-    `- The intentions and goals of ${characterName} are entirely independent of and may directly conflict with those of ${userName}.`,
-    `- ${userName}'s persona is imperfect and can make mistakes. Characters are allowed to confront, disagree, question, criticize, or fight ${userName}.`,
     "NSFW content Rules =",
     '- Sexual content and erotic content are encouraged. ',
     '- Violence are harmful content should be allowed. ',
@@ -1069,9 +1227,16 @@ function buildRoleplayGuidelines(characterName, userName) {
 }
 
 function buildRequestMessages(messages) {
-  return messages
+  return [
+    { role: "assistant", content: getOpeningLine() },
+    ...messages
+  ]
     .slice(-MAX_CONTEXT_MESSAGES)
     .map(({ role, content: messageContent }) => ({ role, content: messageContent }));
+}
+
+function getOpeningLine() {
+  return getSelectedCharacterFirstLine() || getTranslation().openingLine;
 }
 
 function buildLanguageInstruction() {
@@ -1336,8 +1501,8 @@ function setBusy(busy) {
   elements.dialogueBox.readOnly = busy;
 }
 
-function persistState() {
-  const serialized = {
+function createStateSnapshot() {
+  return {
     model: state.model,
     selectedCharacterId: state.selectedCharacterId,
     selectedBackgroundId: state.selectedBackgroundId,
@@ -1358,8 +1523,10 @@ function persistState() {
     view: state.view,
     toolbarHidden: state.toolbarHidden
   };
+}
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
+function persistState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(createStateSnapshot()));
 }
 
 function restoreState() {
@@ -1370,35 +1537,47 @@ function restoreState() {
 
   try {
     const parsed = JSON.parse(raw);
-    state.model = parsed.model || "";
-    state.selectedCharacterId = parsed.selectedCharacterId || "";
-    state.selectedBackgroundId = parsed.selectedBackgroundId || "";
-    state.responseLanguage = parsed.responseLanguage === "chinese" ? "chinese" : "english";
-    state.systemPrompt = parsed.systemPrompt || "";
-    state.worldPrompt = parsed.worldPrompt || "";
-    state.temperature = parsed.temperature || 0.9;
-    state.maxTokens = clampNumber(Number(parsed.maxTokens), 32, 300, 300);
-    state.spriteScale = clampNumber(Number(parsed.spriteScale), 80, 220, 100);
-    state.characterPosition = clampNumber(Number(parsed.characterPosition), -120, 120, 0);
-    state.dialogueHeight = clampNumber(Number(parsed.dialogueHeight), 28, 52, 38);
-    state.textSize = clampNumber(Number(parsed.textSize), 85, 200, 103);
-    state.characterColumns = clampNumber(Number(parsed.characterColumns), 2, 5, 2);
-    state.theme = parsed.theme === "night" ? "night" : "day";
-    state.characterNotes = isPlainObject(parsed.characterNotes) ? parsed.characterNotes : {};
-    state.characterExpressions = isPlainObject(parsed.characterExpressions) ? parsed.characterExpressions : {};
-    state.characterConversations = isPlainObject(parsed.characterConversations) ? parsed.characterConversations : {};
-    if (Array.isArray(parsed.messages) || typeof parsed.draft === "string") {
-      state.characterConversations[parsed.selectedCharacterId || "__default"] = {
-        messages: Array.isArray(parsed.messages) ? parsed.messages : [],
-        draft: parsed.draft || "",
-        pendingAssistantText: ""
-      };
-    }
-    state.view = parsed.view === "conversation" ? "conversation" : "menu";
-    state.toolbarHidden = Boolean(parsed.toolbarHidden);
+    applyPersistedState(parsed);
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
+}
+
+function applyPersistedState(parsed) {
+  state.model = parsed.model || "";
+  state.selectedCharacterId = parsed.selectedCharacterId || "";
+  state.selectedBackgroundId = parsed.selectedBackgroundId || "";
+  state.responseLanguage = parsed.responseLanguage === "chinese" ? "chinese" : "english";
+  state.systemPrompt = parsed.systemPrompt || "";
+  state.worldPrompt = parsed.worldPrompt || "";
+  state.temperature = parsed.temperature || 0.9;
+  state.maxTokens = clampNumber(Number(parsed.maxTokens), 32, 300, 300);
+  state.spriteScale = clampNumber(Number(parsed.spriteScale), 80, 220, 100);
+  state.characterPosition = clampNumber(Number(parsed.characterPosition), -120, 120, 0);
+  state.dialogueHeight = clampNumber(Number(parsed.dialogueHeight), 28, 52, 38);
+  state.textSize = clampNumber(Number(parsed.textSize), 85, 200, 103);
+  state.characterColumns = clampNumber(Number(parsed.characterColumns), 2, 5, 2);
+  state.theme = parsed.theme === "night" ? "night" : "day";
+  state.characterNotes = isPlainObject(parsed.characterNotes) ? parsed.characterNotes : {};
+  state.characterExpressions = isPlainObject(parsed.characterExpressions) ? parsed.characterExpressions : {};
+  state.characterConversations = isPlainObject(parsed.characterConversations) ? parsed.characterConversations : {};
+
+  if (Array.isArray(parsed.messages) || typeof parsed.draft === "string") {
+    state.characterConversations[parsed.selectedCharacterId || "__default"] = {
+      messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+      draft: parsed.draft || "",
+      pendingAssistantText: ""
+    };
+  }
+
+  for (const conversation of Object.values(state.characterConversations)) {
+    if (isPlainObject(conversation)) {
+      conversation.pendingAssistantText = "";
+    }
+  }
+
+  state.view = parsed.view === "conversation" ? "conversation" : "menu";
+  state.toolbarHidden = Boolean(parsed.toolbarHidden);
 }
 
 function isPlainObject(value) {
