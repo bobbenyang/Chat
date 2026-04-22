@@ -15,11 +15,9 @@ loadLocalEnv();
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 const GLM_CHAT_ENDPOINT = process.env.GLM_CHAT_ENDPOINT || "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4.7-flash";
+const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4-flash";
 const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
 const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 20000);
-const GLM_RATE_LIMIT_RETRIES = Number(process.env.GLM_RATE_LIMIT_RETRIES || 3);
-const GLM_RATE_LIMIT_BACKOFF_MS = Number(process.env.GLM_RATE_LIMIT_BACKOFF_MS || 1000);
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -162,7 +160,7 @@ async function streamChatReply(body, res) {
   }
   chatMessages.push(...messages);
 
-  const response = await fetchStreamWithRetry(GLM_CHAT_ENDPOINT, {
+  const response = await fetchStreamWithConnectTimeout(GLM_CHAT_ENDPOINT, {
     method: "POST",
     headers: createGlmHeaders(apiKey),
     body: JSON.stringify({
@@ -180,6 +178,9 @@ async function streamChatReply(body, res) {
 
   if (!response.ok) {
     const payload = await parseResponseBody(response);
+    if (response.status === 429) {
+      throw createHttpError(429, "Server is busy. Please wait 60 seconds and try again.");
+    }
     throw createHttpError(response.status, describeApiError(payload, "GLM chat completion failed."));
   }
 
@@ -519,45 +520,6 @@ async function fetchStreamWithConnectTimeout(url, options) {
     }
     throw error;
   }
-}
-
-async function fetchStreamWithRetry(url, options) {
-  let lastResponse = null;
-
-  for (let attempt = 0; attempt <= GLM_RATE_LIMIT_RETRIES; attempt += 1) {
-    const response = await fetchStreamWithConnectTimeout(url, options);
-    if (response.status !== 429 || attempt === GLM_RATE_LIMIT_RETRIES) {
-      return response;
-    }
-
-    lastResponse = response;
-    const delay = readRetryDelayMs(response, attempt);
-    console.warn(
-      `[${new Date().toISOString()}] GLM rate limited request. Retrying in ${delay} ms ` +
-        `(${attempt + 1}/${GLM_RATE_LIMIT_RETRIES}).`
-    );
-    await response.body?.cancel().catch(() => {});
-    await wait(delay);
-  }
-
-  return lastResponse;
-}
-
-function readRetryDelayMs(response, attempt) {
-  const retryAfter = response.headers.get("retry-after");
-  const retryAfterSeconds = Number(retryAfter);
-  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-    return retryAfterSeconds * 1000;
-  }
-
-  const exponentialDelay = GLM_RATE_LIMIT_BACKOFF_MS * (2 ** attempt);
-  return Math.min(exponentialDelay, 8000);
-}
-
-function wait(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 function loadLocalEnv() {
