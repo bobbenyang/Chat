@@ -423,7 +423,7 @@ textarea:focus {
     var(--scene-background),
     var(--surface-soft);
   background-position: center;
-  background-size: auto 100%;
+  background-size: cover;
   background-repeat: no-repeat;
   overflow: hidden;
 }
@@ -679,5 +679,69 @@ textarea:focus {
 
   .setting-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .conversation-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .conversation-title {
+    min-width: 0;
+  }
+
+  .conversation-title > div {
+    min-width: 0;
+  }
+
+  .conversation-header h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--dialogue-height) + 0.85rem + env(safe-area-inset-bottom));
+    z-index: 18;
+    justify-content: center;
+    width: min(18rem, calc(100vw - 2rem));
+    transform: translateX(-50%);
+  }
+
+  .header-actions .button,
+  .quick-settings {
+    flex: 1;
+  }
+
+  .quick-settings summary,
+  .header-actions > .button {
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+
+  .quick-settings-panel {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(100% + 0.55rem);
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - var(--dialogue-height) - 4.75rem);
+    overflow-y: auto;
+    transform: translateX(-50%);
+  }
+
+  .dialogue-form {
+    width: min(42rem, calc(100% - 3rem));
+    margin: var(--dialogue-overlap-negative) auto 0;
+    padding: 0.75rem 0;
+  }
+
+  .dialogue-box {
+    min-height: 7rem;
   }
 }
