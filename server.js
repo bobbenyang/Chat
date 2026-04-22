@@ -54,6 +54,7 @@ createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
+      console.log(`[${new Date().toISOString()}] POST /api/chat`);
       const body = await readJsonBody(req);
       validateChatRequest(body);
       const reply = await generateChatReply(body);
@@ -77,6 +78,9 @@ createServer(async (req, res) => {
     return serveStatic(url.pathname, res, isHead);
   } catch (error) {
     const status = error.statusCode || 500;
+    console.error(
+      `[${new Date().toISOString()}] ${req.method} ${req.url} failed with ${status}: ${error.stack || error.message || error}`
+    );
     return sendJson(res, status, {
       error: error.message || "Unexpected server error."
     });
