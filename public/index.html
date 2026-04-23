@@ -30,6 +30,19 @@
 
           <div class="settings-stack">
             <label class="field">
+              <span data-i18n="modelLabel">Model</span>
+              <select id="modelSelect"></select>
+            </label>
+
+            <label class="field">
+              <span class="field-label-row">
+                <span data-i18n="temperatureLabel">Temperature</span>
+                <output id="temperatureValue" for="temperatureInput">0.9</output>
+              </span>
+              <input id="temperatureInput" type="range" min="0" max="2" step="0.1" value="0.9" />
+            </label>
+
+            <label class="field">
               <span data-i18n="fontSizeLabel">Font Size</span>
               <input id="menuTextSizeInput" type="range" min="85" max="200" step="5" value="103" />
             </label>
@@ -125,10 +138,8 @@
       </div>
 
       <div hidden>
-        <select id="modelSelect"></select>
         <textarea id="systemPrompt"></textarea>
         <textarea id="worldPrompt"></textarea>
-        <input id="temperatureInput" type="number" min="0" max="2" step="0.1" value="0.9" />
         <input id="maxTokensInput" type="number" min="32" max="300" step="1" value="300" />
       </div>
 

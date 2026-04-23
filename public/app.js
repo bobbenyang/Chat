@@ -186,6 +186,7 @@ const elements = {
   systemPrompt: document.querySelector("#systemPrompt"),
   worldPrompt: document.querySelector("#worldPrompt"),
   temperatureInput: document.querySelector("#temperatureInput"),
+  temperatureValue: document.querySelector("#temperatureValue"),
   maxTokensInput: document.querySelector("#maxTokensInput"),
   spriteScaleInput: document.querySelector("#spriteScaleInput"),
   characterSizeQuickInput: document.querySelector("#characterSizeQuickInput"),
@@ -281,7 +282,8 @@ function bindEvents() {
   });
 
   elements.temperatureInput.addEventListener("input", () => {
-    state.temperature = Number(elements.temperatureInput.value) || 0.9;
+    state.temperature = clampNumber(Number(elements.temperatureInput.value), 0, 2, 0.9);
+    renderTemperatureValue();
     persistState();
   });
 
@@ -662,6 +664,7 @@ function render() {
   elements.systemPrompt.value = state.systemPrompt;
   elements.worldPrompt.value = state.worldPrompt;
   elements.temperatureInput.value = String(state.temperature);
+  renderTemperatureValue();
   elements.maxTokensInput.value = String(state.maxTokens);
   elements.spriteScaleInput.value = String(state.spriteScale);
   elements.characterSizeQuickInput.value = String(state.spriteScale);
@@ -716,6 +719,7 @@ function applyTranslations() {
 
 function renderModelOptions() {
   elements.modelSelect.innerHTML = "";
+  elements.modelSelect.disabled = state.models.length === 0;
 
   if (state.models.length === 0) {
     const option = document.createElement("option");
@@ -732,6 +736,10 @@ function renderModelOptions() {
     option.selected = model.id === state.model;
     elements.modelSelect.append(option);
   }
+}
+
+function renderTemperatureValue() {
+  elements.temperatureValue.textContent = state.temperature.toFixed(1);
 }
 
 function renderBackgroundStrip() {
@@ -1551,7 +1559,7 @@ function applyPersistedState(parsed) {
   state.responseLanguage = parsed.responseLanguage === "chinese" ? "chinese" : "english";
   state.systemPrompt = parsed.systemPrompt || "";
   state.worldPrompt = parsed.worldPrompt || "";
-  state.temperature = parsed.temperature || 0.9;
+  state.temperature = clampNumber(Number(parsed.temperature), 0, 2, 0.9);
   state.maxTokens = clampNumber(Number(parsed.maxTokens), 32, 300, 300);
   state.spriteScale = clampNumber(Number(parsed.spriteScale), 80, 220, 100);
   state.characterPosition = clampNumber(Number(parsed.characterPosition), -120, 120, 0);

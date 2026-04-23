@@ -14,8 +14,14 @@ loadLocalEnv();
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
-const GLM_CHAT_ENDPOINT = process.env.GLM_CHAT_ENDPOINT || "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4-flash";
+const GLM_CHAT_ENDPOINT = process.env.GLM_CHAT_ENDPOINT || "https://openrouter.ai/api/v1/chat/completions";
+const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "nousresearch/hermes-2-pro-llama-3-8b";
+const DEFAULT_MODEL_LIST = [
+  "nousresearch/hermes-2-pro-llama-3-8b",
+  "deepseek/deepseek-v3.2",
+  "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+];
+const GLM_MODELS = parseConfiguredModels(process.env.GLM_MODELS, GLM_DEFAULT_MODEL);
 const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
 const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 60000);
 
@@ -210,13 +216,21 @@ async function streamChatReply(body, res) {
 
 async function fetchModels() {
   getGlmApiKey();
-  return [
-    {
-      id: GLM_DEFAULT_MODEL,
-      object: "model",
-      owned_by: "glm"
-    }
-  ];
+  return GLM_MODELS.map((id) => ({
+    id,
+    object: "model",
+    owned_by: "glm"
+  }));
+}
+
+function parseConfiguredModels(rawModels, defaultModel) {
+  const configuredModels = typeof rawModels === "string"
+    ? rawModels.split(",").map((model) => model.trim()).filter(Boolean)
+    : [];
+  const fallbackModels = configuredModels.length > 0 ? configuredModels : DEFAULT_MODEL_LIST;
+  const modelIds = [defaultModel, ...fallbackModels].filter(Boolean);
+
+  return [...new Set(modelIds)];
 }
 
 async function listCharacters() {

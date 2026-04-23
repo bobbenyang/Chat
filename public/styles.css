@@ -322,6 +322,17 @@ textarea {
   opacity: 0.76;
 }
 
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.field-label-row output {
+  font: inherit;
+}
+
 .setting-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

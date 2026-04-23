@@ -1,11 +1,12 @@
 # GLM Chat Companion
 
-Small local web app for chatting with GLM through a local Node server.
+Small local web app for chatting through a local Node server.
 
 ## Features
 
-- Server-side GLM API key via `GLM_API_KEY`
-- Configurable GLM model via `GLM_MODEL`
+- Server-side API key via `OPENROUTER_API_KEY`, `GLM_API_KEY`, or `GLM_API`
+- Configurable default model via `GLM_MODEL`
+- Optional model switcher list via comma-separated `GLM_MODELS`
 - Local browser persistence for settings and chat history
 - Character picker using the bundled avatar art in `Characters/`
 - Persona or "character card" prompt box for roleplay/chat setup
@@ -22,8 +23,10 @@ cp .env.local.example .env.local
 Then edit `.env.local`:
 
 ```bash
-GLM_API_KEY="your_key_here"
-GLM_MODEL="glm-4.7-flash"
+OPENROUTER_API_KEY="your_key_here"
+GLM_CHAT_ENDPOINT="https://openrouter.ai/api/v1/chat/completions"
+GLM_MODEL="nousresearch/hermes-2-pro-llama-3-8b"
+GLM_MODELS="nousresearch/hermes-2-pro-llama-3-8b,deepseek/deepseek-v3.2,cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
 ```
 
 Start the app:
@@ -38,7 +41,7 @@ Then open `http://localhost:3000`.
 
 - The API key is read from `.env.local` or the local server environment.
 - The browser never receives or stores the API key.
-- The app sends chat requests to GLM's OpenAI-compatible chat endpoint.
+- The app sends chat requests to an OpenAI-compatible chat endpoint.
 
 ## Character files
 
