@@ -205,6 +205,21 @@
           </section>
         </div>
 
+        <div id="clearChatConfirmModal" class="modal-overlay" hidden>
+          <section class="modal-panel modal-panel-narrow" role="dialog" aria-modal="true" aria-labelledby="clearChatConfirmTitle">
+            <header class="modal-header">
+              <h2 id="clearChatConfirmTitle" data-i18n="clearConfirmTitle">Clear conversation?</h2>
+            </header>
+
+            <p class="modal-body-text" data-i18n="clearConfirmMessage">This will delete the current chat history. This cannot be undone.</p>
+
+            <footer class="modal-footer">
+              <button id="cancelClearChatButton" class="button button-ghost" type="button" data-i18n="cancelButton">Cancel</button>
+              <button id="confirmClearChatButton" class="button button-primary" type="button" data-i18n="clearConfirmButton">Clear Conversation</button>
+            </footer>
+          </section>
+        </div>
+
         <div class="character-stage">
           <img id="characterPortrait" class="character-portrait" src="" alt="" />
         </div>

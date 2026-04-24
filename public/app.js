@@ -70,6 +70,10 @@ const TRANSLATIONS = {
     characterSizeLabel: "Character Size",
     dialogueHeightLabel: "Dialogue Height",
     clearButton: "Clear",
+    clearConfirmTitle: "Clear conversation?",
+    clearConfirmMessage: "This will delete the current chat history. This cannot be undone.",
+    clearConfirmButton: "Clear Conversation",
+    cancelButton: "Cancel",
     historyLabel: "History File",
     exportHistoryButton: "Export History",
     importHistoryButton: "Import History",
@@ -138,6 +142,10 @@ const TRANSLATIONS = {
     characterSizeLabel: "角色大小",
     dialogueHeightLabel: "对话框高度",
     clearButton: "清空",
+    clearConfirmTitle: "清空对话？",
+    clearConfirmMessage: "这会删除当前聊天历史，且无法撤销。",
+    clearConfirmButton: "清空对话",
+    cancelButton: "取消",
     historyLabel: "历史文件",
     exportHistoryButton: "导出历史",
     importHistoryButton: "导入历史",
@@ -204,6 +212,9 @@ const elements = {
   conversationSettingsModal: document.querySelector("#conversationSettingsModal"),
   closeConversationSettingsButton: document.querySelector("#closeConversationSettingsButton"),
   clearChatButton: document.querySelector("#clearChatButton"),
+  clearChatConfirmModal: document.querySelector("#clearChatConfirmModal"),
+  cancelClearChatButton: document.querySelector("#cancelClearChatButton"),
+  confirmClearChatButton: document.querySelector("#confirmClearChatButton"),
   exportHistoryButton: document.querySelector("#exportHistoryButton"),
   importHistoryButton: document.querySelector("#importHistoryButton"),
   historyFileInput: document.querySelector("#historyFileInput"),
@@ -377,7 +388,10 @@ function bindEvents() {
   elements.openConversationSettingsButton.addEventListener("click", openConversationSettings);
   elements.closeConversationSettingsButton.addEventListener("click", closeConversationSettings);
   elements.conversationSettingsModal.addEventListener("pointerdown", closeConversationSettingsOnOutsideClick);
-  elements.clearChatButton.addEventListener("click", clearConversation);
+  elements.clearChatButton.addEventListener("click", openClearChatConfirm);
+  elements.cancelClearChatButton.addEventListener("click", closeClearChatConfirm);
+  elements.confirmClearChatButton.addEventListener("click", confirmClearConversation);
+  elements.clearChatConfirmModal.addEventListener("pointerdown", closeClearChatConfirmOnOutsideClick);
   elements.exportHistoryButton.addEventListener("click", exportHistoryFile);
   elements.importHistoryButton.addEventListener("click", () => {
     elements.historyFileInput.value = "";
@@ -515,6 +529,11 @@ function clearConversation() {
   persistState();
   renderDialogue({ scrollToEnd: false });
   updateStatus(getTranslation().statusConversationCleared);
+}
+
+function confirmClearConversation() {
+  closeClearChatConfirm();
+  clearConversation();
 }
 
 function exportHistoryFile() {
@@ -802,6 +821,22 @@ function closeConversationSettings() {
 function closeConversationSettingsOnOutsideClick(event) {
   if (event.target === elements.conversationSettingsModal) {
     closeConversationSettings();
+  }
+}
+
+function openClearChatConfirm() {
+  elements.clearChatConfirmModal.hidden = false;
+  elements.cancelClearChatButton.focus();
+}
+
+function closeClearChatConfirm() {
+  elements.clearChatConfirmModal.hidden = true;
+  elements.clearChatButton.focus();
+}
+
+function closeClearChatConfirmOnOutsideClick(event) {
+  if (event.target === elements.clearChatConfirmModal) {
+    closeClearChatConfirm();
   }
 }
 

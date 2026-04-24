@@ -265,6 +265,11 @@ textarea {
   font-size: var(--ui-font-size);
 }
 
+.modal-panel-narrow {
+  grid-template-rows: auto auto auto;
+  width: min(28rem, 100%);
+}
+
 .modal-header,
 .modal-footer {
   display: flex;
@@ -282,6 +287,12 @@ textarea {
 
 .modal-header h2 {
   margin: 0;
+}
+
+.modal-body-text {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .modal-panel .settings-stack {
