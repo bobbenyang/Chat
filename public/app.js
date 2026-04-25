@@ -29,6 +29,13 @@ const TRANSLATIONS = {
     documentTitle: "GLM Chat Companion",
     charactersEyebrow: "Characters",
     menuTitle: "Menu",
+    charactersPageButton: "Characters",
+    storiesPageButton: "Stories",
+    storyNextButton: "Next CG",
+    storyStartGameButton: "Start Game",
+    storyReturnToGameButton: "Return to Game",
+    storyEndingButton: "Ending Reached",
+    storyDialogueAriaLabel: "Story dialogue",
     settingsButton: "Settings",
     menuSettingsTitle: "Settings",
     closeButton: "Close",
@@ -101,6 +108,13 @@ const TRANSLATIONS = {
     documentTitle: "GLM 聊天助手",
     charactersEyebrow: "角色",
     menuTitle: "菜单",
+    charactersPageButton: "角色",
+    storiesPageButton: "故事",
+    storyNextButton: "下一张 CG",
+    storyStartGameButton: "开始游戏",
+    storyReturnToGameButton: "返回游戏",
+    storyEndingButton: "已到达结局",
+    storyDialogueAriaLabel: "故事对话",
     settingsButton: "设置",
     menuSettingsTitle: "设置",
     closeButton: "关闭",
@@ -172,7 +186,10 @@ const TRANSLATIONS = {
 
 const elements = {
   appShell: document.querySelector("#appShell"),
+  menuEyebrow: document.querySelector("#menuEyebrow"),
   characterGrid: document.querySelector("#characterGrid"),
+  storyGrid: document.querySelector("#storyGrid"),
+  menuPageToggle: document.querySelector("#menuPageToggle"),
   openMenuSettingsButton: document.querySelector("#openMenuSettingsButton"),
   menuSettingsModal: document.querySelector("#menuSettingsModal"),
   closeMenuSettingsButton: document.querySelector("#closeMenuSettingsButton"),
@@ -219,8 +236,33 @@ const elements = {
   importHistoryButton: document.querySelector("#importHistoryButton"),
   historyFileInput: document.querySelector("#historyFileInput"),
   chatForm: document.querySelector("#chatForm"),
-  dialogueBox: document.querySelector("#dialogueBox")
+  dialogueBox: document.querySelector("#dialogueBox"),
+  backFromMinigameButton: document.querySelector("#backFromMinigameButton"),
+  backFromStoryButton: document.querySelector("#backFromStoryButton"),
+  openStorySettingsButton: document.querySelector("#openStorySettingsButton"),
+  storySettingsModal: document.querySelector("#storySettingsModal"),
+  closeStorySettingsButton: document.querySelector("#closeStorySettingsButton"),
+  storyTextSizeInput: document.querySelector("#storyTextSizeInput"),
+  storyCharacterPositionInput: document.querySelector("#storyCharacterPositionInput"),
+  storyCharacterSizeInput: document.querySelector("#storyCharacterSizeInput"),
+  storyDialogueHeightInput: document.querySelector("#storyDialogueHeightInput"),
+  storyBackgroundQuickStrip: document.querySelector("#storyBackgroundQuickStrip"),
+  storyTitle: document.querySelector("#storyTitle"),
+  storyCgImage: document.querySelector("#storyCgImage"),
+  storyChatForm: document.querySelector("#storyChatForm"),
+  storyDialogueBox: document.querySelector("#storyDialogueBox"),
+  storyNextButton: document.querySelector("#storyNextButton"),
+  minigameFrame: document.querySelector("#minigameFrame")
 };
+
+const STORIES = [
+  {
+    id: "mitsui-hisashi",
+    name: "Mitsui Hisashi",
+    avatar: "/Stories/Mitsui_Hisashi/Avatar.png",
+    metadata: "/Stories/Mitsui_Hisashi/story.json"
+  }
+];
 
 const state = {
   model: "",
@@ -243,6 +285,12 @@ const state = {
   characterNotes: {},
   characterExpressions: {},
   characterConversations: {},
+  storyData: {},
+  storyConversations: {},
+  selectedStoryId: "",
+  selectedStoryCgId: 1,
+  storyScores: {},
+  menuPage: "characters",
   editingCharacterId: "",
   view: "menu",
   toolbarHidden: false,
@@ -261,8 +309,30 @@ async function bootstrap() {
   bindEvents();
   await loadCharacters();
   await loadBackgrounds();
+  await loadPersistedStory();
   render();
   await connectToNovelAi();
+}
+
+async function loadPersistedStory() {
+  if (!state.selectedStoryId) {
+    return;
+  }
+
+  const story = STORIES.find((entry) => entry.id === state.selectedStoryId);
+  if (!story) {
+    state.selectedStoryId = "";
+    state.view = "menu";
+    return;
+  }
+
+  try {
+    await loadStory(story);
+  } catch (error) {
+    console.warn(`Could not restore story ${story.id}: ${error.message}`);
+    state.selectedStoryId = "";
+    state.view = "menu";
+  }
 }
 
 function bindEvents() {
@@ -311,8 +381,20 @@ function bindEvents() {
     updateSpriteScale(elements.characterSizeQuickInput.value);
   });
 
+  elements.storyCharacterSizeInput.addEventListener("input", () => {
+    updateSpriteScale(elements.storyCharacterSizeInput.value);
+  });
+
   elements.characterPositionInput.addEventListener("input", () => {
     state.characterPosition = clampNumber(Number(elements.characterPositionInput.value), -120, 120, 0);
+    elements.storyCharacterPositionInput.value = String(state.characterPosition);
+    applySceneSizing();
+    persistState();
+  });
+
+  elements.storyCharacterPositionInput.addEventListener("input", () => {
+    state.characterPosition = clampNumber(Number(elements.storyCharacterPositionInput.value), -120, 120, 0);
+    elements.characterPositionInput.value = String(state.characterPosition);
     applySceneSizing();
     persistState();
   });
@@ -325,8 +407,16 @@ function bindEvents() {
     updateDialogueHeight(elements.dialogueHeightQuickInput.value);
   });
 
+  elements.storyDialogueHeightInput.addEventListener("input", () => {
+    updateDialogueHeight(elements.storyDialogueHeightInput.value);
+  });
+
   elements.textSizeInput.addEventListener("input", () => {
     updateTextSize(elements.textSizeInput.value);
+  });
+
+  elements.storyTextSizeInput.addEventListener("input", () => {
+    updateTextSize(elements.storyTextSizeInput.value);
   });
 
   elements.dialogueBox.addEventListener("input", syncDraftFromDialogue);
@@ -340,6 +430,26 @@ function bindEvents() {
   });
 
   elements.chatForm.addEventListener("submit", sendMessage);
+  elements.storyDialogueBox.addEventListener("input", syncDraftFromStoryDialogue);
+  elements.storyDialogueBox.addEventListener("focus", moveCaretToStoryDialogueEnd);
+  elements.storyDialogueBox.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      elements.storyChatForm.requestSubmit();
+    }
+  });
+  elements.storyChatForm.addEventListener("submit", sendStoryMessage);
+  elements.storyNextButton.addEventListener("click", advanceStoryFromButton);
+  elements.menuPageToggle.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-menu-page-value]");
+    if (!button) {
+      return;
+    }
+
+    state.menuPage = button.dataset.menuPageValue === "stories" ? "stories" : "characters";
+    persistState();
+    renderMenuPage();
+  });
   elements.openMenuSettingsButton.addEventListener("click", openMenuSettings);
   elements.closeMenuSettingsButton.addEventListener("click", closeMenuSettings);
   elements.menuSettingsModal.addEventListener("pointerdown", closeMenuSettingsOnOutsideClick);
@@ -398,6 +508,12 @@ function bindEvents() {
     elements.historyFileInput.click();
   });
   elements.historyFileInput.addEventListener("change", importHistoryFile);
+  elements.backFromStoryButton.addEventListener("click", () => setView("menu"));
+  elements.openStorySettingsButton.addEventListener("click", openStorySettings);
+  elements.closeStorySettingsButton.addEventListener("click", closeStorySettings);
+  elements.storySettingsModal.addEventListener("pointerdown", closeStorySettingsOnOutsideClick);
+  elements.backFromMinigameButton.addEventListener("click", () => setView("story"));
+  window.addEventListener("message", handleMinigameMessage);
 }
 
 async function loadCharacters() {
@@ -687,10 +803,14 @@ function render() {
   elements.maxTokensInput.value = String(state.maxTokens);
   elements.spriteScaleInput.value = String(state.spriteScale);
   elements.characterSizeQuickInput.value = String(state.spriteScale);
+  elements.storyCharacterSizeInput.value = String(state.spriteScale);
   elements.characterPositionInput.value = String(state.characterPosition);
+  elements.storyCharacterPositionInput.value = String(state.characterPosition);
   elements.dialogueHeightInput.value = String(state.dialogueHeight);
   elements.dialogueHeightQuickInput.value = String(state.dialogueHeight);
+  elements.storyDialogueHeightInput.value = String(state.dialogueHeight);
   elements.textSizeInput.value = String(state.textSize);
+  elements.storyTextSizeInput.value = String(state.textSize);
   elements.menuTextSizeInput.value = String(state.textSize);
   elements.characterColumnsInput.value = String(state.characterColumns);
 
@@ -698,9 +818,12 @@ function render() {
   applySceneSizing();
   renderThemeToggle();
   renderLanguageToggle();
+  renderMenuPage();
   renderModelOptions();
   renderBackgroundStrip();
   renderCharacterCards();
+  renderStoryCards();
+  renderStory();
   renderCharacter();
   renderDialogue({ scrollToEnd: true });
   renderView();
@@ -764,6 +887,7 @@ function renderTemperatureValue() {
 function renderBackgroundStrip() {
   renderBackgroundCards(elements.backgroundStrip);
   renderBackgroundCards(elements.backgroundQuickStrip);
+  renderBackgroundCards(elements.storyBackgroundQuickStrip);
 }
 
 function renderBackgroundCards(container) {
@@ -821,6 +945,20 @@ function closeConversationSettings() {
 function closeConversationSettingsOnOutsideClick(event) {
   if (event.target === elements.conversationSettingsModal) {
     closeConversationSettings();
+  }
+}
+
+function openStorySettings() {
+  elements.storySettingsModal.hidden = false;
+}
+
+function closeStorySettings() {
+  elements.storySettingsModal.hidden = true;
+}
+
+function closeStorySettingsOnOutsideClick(event) {
+  if (event.target === elements.storySettingsModal) {
+    closeStorySettings();
   }
 }
 
@@ -986,6 +1124,367 @@ function renderCharacterCards() {
   }
 }
 
+function renderStoryCards() {
+  elements.storyGrid.innerHTML = "";
+
+  for (const story of STORIES) {
+    const card = document.createElement("article");
+    card.className = "character-card story-card";
+    card.dataset.storyId = story.id;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "character-select";
+    button.setAttribute("aria-label", story.name);
+
+    const image = document.createElement("img");
+    image.src = story.avatar;
+    image.alt = `${story.name} avatar`;
+
+    const footer = document.createElement("div");
+    footer.className = "character-card-footer";
+
+    const name = document.createElement("strong");
+    name.textContent = story.name;
+
+    button.append(image);
+    button.addEventListener("click", () => openStory(story.id));
+    footer.append(name);
+    card.append(button, footer);
+    elements.storyGrid.append(card);
+  }
+}
+
+function renderMenuPage() {
+  const isStoriesPage = state.menuPage === "stories";
+  elements.characterGrid.hidden = isStoriesPage;
+  elements.storyGrid.hidden = !isStoriesPage;
+  elements.menuEyebrow.textContent = isStoriesPage
+    ? getTranslation().storiesPageButton
+    : getTranslation().charactersEyebrow;
+
+  for (const button of elements.menuPageToggle.querySelectorAll("[data-menu-page-value]")) {
+    button.classList.toggle("is-active", button.dataset.menuPageValue === state.menuPage);
+  }
+}
+
+function openStory(storyId) {
+  const story = STORIES.find((entry) => entry.id === storyId);
+  if (!story) {
+    return;
+  }
+
+  loadStory(story)
+    .then(() => {
+      state.selectedStoryId = story.id;
+      state.selectedStoryCgId = 1;
+      state.storyScores[story.id] = { red: 0, black: 0 };
+      resetMinigame();
+      persistState();
+      renderStory();
+      setView("story");
+      moveCaretToStoryDialogueEnd();
+    })
+    .catch((error) => {
+      console.error(error);
+      updateStatus(error.message || "Could not load story.");
+    });
+}
+
+async function loadStory(story) {
+  if (state.storyData[story.id]) {
+    return state.storyData[story.id];
+  }
+
+  const response = await fetch(story.metadata);
+  if (!response.ok) {
+    throw new Error("Could not load story metadata.");
+  }
+
+  const data = await response.json();
+  state.storyData[story.id] = data;
+  return data;
+}
+
+function renderStory() {
+  const story = getSelectedStory();
+  const cg = getSelectedStoryCg();
+  if (!story || !cg) {
+    return;
+  }
+
+  elements.storyTitle.textContent = getLocalizedStoryText(story).name || "Story";
+  elements.storyCgImage.src = cg.image;
+  elements.storyCgImage.alt = `${elements.storyTitle.textContent} CG ${cg.id}`;
+  renderStoryDialogue({ scrollToEnd: true });
+  renderStoryNextButton();
+}
+
+function renderStoryNextButton() {
+  const cg = getSelectedStoryCg();
+  const condition = cg?.next_condition || {};
+  elements.storyNextButton.disabled = false;
+
+  if (condition.type === "game") {
+    const scores = getSelectedStoryScores();
+    const hasStarted = scores.red > 0 || scores.black > 0;
+    elements.storyNextButton.textContent = hasStarted
+      ? getTranslation().storyReturnToGameButton
+      : getTranslation().storyStartGameButton;
+    return;
+  }
+
+  if (condition.type === "end") {
+    elements.storyNextButton.textContent = getTranslation().storyEndingButton;
+    elements.storyNextButton.disabled = true;
+    return;
+  }
+
+  elements.storyNextButton.textContent = getTranslation().storyNextButton;
+}
+
+function advanceStoryFromButton() {
+  const cg = getSelectedStoryCg();
+  const condition = cg?.next_condition || {};
+  if (condition.type === "game") {
+    setView("minigame");
+    focusMinigame();
+    return;
+  }
+
+  if (condition.type === "manual" && condition.next) {
+    setStoryCg(condition.next);
+  }
+}
+
+function handleMinigameMessage(event) {
+  if (event.source !== elements.minigameFrame.contentWindow || !isPlainObject(event.data)) {
+    return;
+  }
+
+  if (event.data.type !== "basketball-score") {
+    return;
+  }
+
+  const story = getSelectedStory();
+  if (!story) {
+    return;
+  }
+
+  state.storyScores[story.id] = {
+    red: clampNumber(Number(event.data.red), 0, 999, 0),
+    black: clampNumber(Number(event.data.black), 0, 999, 0)
+  };
+
+  const nextCg = findTriggeredStoryCg(story, state.storyScores[story.id]);
+  if (nextCg && nextCg.id !== state.selectedStoryCgId) {
+    state.selectedStoryCgId = nextCg.id;
+    persistState();
+    renderStory();
+    setView("story");
+    moveCaretToStoryDialogueEnd();
+    return;
+  }
+
+  persistState();
+}
+
+function findTriggeredStoryCg(story, scores) {
+  const currentId = Number(state.selectedStoryCgId);
+  const candidates = (story.cgs || [])
+    .filter((cg) => Number(cg.id) > currentId && doesStoryTriggerMatch(cg.trigger, scores))
+    .sort((a, b) => {
+      const aLose = a.trigger?.team === "black" ? 0 : 1;
+      const bLose = b.trigger?.team === "black" ? 0 : 1;
+      return aLose - bLose || Number(a.id) - Number(b.id);
+    });
+
+  return candidates[0] || null;
+}
+
+function doesStoryTriggerMatch(trigger, scores) {
+  if (!trigger || trigger.type !== "score") {
+    return false;
+  }
+
+  const team = trigger.team === "black" ? "black" : "red";
+  return scores[team] >= Number(trigger.at_least || 0);
+}
+
+function setStoryCg(cgId) {
+  state.selectedStoryCgId = Number(cgId);
+  persistState();
+  renderStory();
+  moveCaretToStoryDialogueEnd();
+}
+
+function resetMinigame() {
+  elements.minigameFrame.contentWindow?.postMessage({ type: "basketball-reset" }, window.location.origin);
+}
+
+function focusMinigame() {
+  requestAnimationFrame(() => {
+    elements.minigameFrame.focus();
+  });
+}
+
+async function sendStoryMessage(event) {
+  event.preventDefault();
+  syncDraftFromStoryDialogue();
+
+  const conversation = getSelectedStoryConversation();
+  const content = conversation.draft.trim();
+  if (!content || state.busy) {
+    renderStoryDialogue({ scrollToEnd: true });
+    return;
+  }
+
+  if (state.models.length === 0) {
+    updateStatus(getTranslation().statusNeedConnect);
+    return;
+  }
+
+  if (!state.model) {
+    updateStatus(getTranslation().statusNeedModel);
+    return;
+  }
+
+  conversation.messages.push({ role: "user", content, timestamp: new Date().toISOString() });
+  conversation.draft = "";
+  conversation.pendingAssistantText = "...";
+  setBusy(true);
+  persistState();
+  renderStoryDialogue({ scrollToEnd: true });
+
+  try {
+    let streamedReply = "";
+    const reply = await postStreamingChat("/api/chat", {
+      model: state.model,
+      systemPrompt: buildStorySystemPrompt(),
+      messages: buildStoryRequestMessages(conversation.messages),
+      temperature: state.temperature,
+      maxTokens: state.maxTokens
+    }, (text) => {
+      streamedReply += text;
+      conversation.pendingAssistantText = streamedReply;
+      renderStoryDialogue({ scrollToEnd: true });
+    });
+
+    conversation.messages.push({
+      role: "assistant",
+      content: reply.trim(),
+      timestamp: new Date().toISOString()
+    });
+    conversation.pendingAssistantText = "";
+    setBusy(false);
+    persistState();
+    renderStoryDialogue({ scrollToEnd: true });
+  } catch (error) {
+    conversation.pendingAssistantText = "";
+    setBusy(false);
+    updateStatus(error.message || getTranslation().statusMessageFailed);
+    persistState();
+    renderStoryDialogue({ scrollToEnd: true });
+  }
+}
+
+function renderStoryDialogue({ scrollToEnd = false } = {}) {
+  elements.storyDialogueBox.value = buildStoryDialogueText();
+  if (scrollToEnd) {
+    moveCaretToStoryDialogueEnd();
+  } else {
+    elements.storyDialogueBox.scrollTop = 0;
+  }
+}
+
+function buildStoryDialogueText() {
+  return `${buildStoryDialoguePrefix()}${getSelectedStoryConversation().draft}`;
+}
+
+function buildStoryDialoguePrefix() {
+  const story = getSelectedStory();
+  const cg = getSelectedStoryCg();
+  const storyText = getLocalizedStoryText(story);
+  const cgText = getLocalizedStoryText(cg);
+  const storyName = storyText.name || "Mitsui Hisashi";
+  const conversation = getSelectedStoryConversation();
+  const turns = [`${storyName}: ${cgText.first_line || storyText.first_line || ""}`];
+
+  for (const message of conversation.messages) {
+    const speaker = message.role === "user" ? getUserLabel() : storyName;
+    turns.push(`${speaker}: ${message.content}`);
+  }
+
+  if (state.busy && state.view === "story") {
+    turns.push(`${storyName}: ${conversation.pendingAssistantText}`);
+    return turns.join("\n");
+  }
+
+  turns.push(`${getUserLabel()}: `);
+  return turns.join("\n");
+}
+
+function syncDraftFromStoryDialogue() {
+  if (state.busy) {
+    return;
+  }
+
+  const value = elements.storyDialogueBox.value;
+  const expectedPrefix = buildStoryDialoguePrefix();
+  const conversation = getSelectedStoryConversation();
+  if (value.startsWith(expectedPrefix)) {
+    conversation.draft = value.slice(expectedPrefix.length);
+    persistState();
+    return;
+  }
+
+  const prompt = `${getUserLabel()}:`;
+  const index = value.lastIndexOf(prompt);
+  if (index === -1) {
+    renderStoryDialogue({ scrollToEnd: true });
+    return;
+  }
+
+  conversation.draft = value.slice(index + prompt.length).replace(/^\s*/, "");
+  persistState();
+}
+
+function moveCaretToStoryDialogueEnd() {
+  const end = elements.storyDialogueBox.value.length;
+  elements.storyDialogueBox.setSelectionRange(end, end);
+  elements.storyDialogueBox.scrollTop = elements.storyDialogueBox.scrollHeight;
+}
+
+function buildStorySystemPrompt() {
+  const story = getSelectedStory();
+  const cg = getSelectedStoryCg();
+  const storyText = getLocalizedStoryText(story);
+  const cgText = getLocalizedStoryText(cg);
+
+  return [
+    `You are roleplaying as ${storyText.name || "Mitsui Hisashi"}. Stay in character and do not write the user's next line.`,
+    "Keep each reply brief and chat-like: one to three short sentences.",
+    buildLanguageInstruction(),
+    storyText.prompt ? `Character description:\n${storyText.prompt}` : "",
+    cgText.prompt ? `Current CG scene:\n${cgText.prompt}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildStoryRequestMessages(messages) {
+  const firstLine = getLocalizedStoryText(getSelectedStoryCg()).first_line ||
+    getLocalizedStoryText(getSelectedStory()).first_line ||
+    "";
+
+  return [
+    { role: "assistant", content: firstLine },
+    ...messages
+  ]
+    .slice(-MAX_CONTEXT_MESSAGES)
+    .map(({ role, content: messageContent }) => ({ role, content: messageContent }));
+}
+
 function selectCharacter(characterId) {
   state.selectedCharacterId = characterId;
   state.view = "conversation";
@@ -1001,15 +1500,23 @@ function setView(view) {
   state.view = view;
   persistState();
   renderView();
+  syncMinigamePlayback();
 
   if (view === "conversation") {
     moveCaretToDialogueEnd();
   }
 }
 
+function syncMinigamePlayback() {
+  const messageType = state.view === "minigame" ? "basketball-resume" : "basketball-pause";
+  elements.minigameFrame.contentWindow?.postMessage({ type: messageType }, window.location.origin);
+}
+
 function renderView() {
-  elements.appShell.classList.toggle("view-menu", state.view !== "conversation");
+  elements.appShell.classList.toggle("view-menu", state.view === "menu");
   elements.appShell.classList.toggle("view-conversation", state.view === "conversation");
+  elements.appShell.classList.toggle("view-story", state.view === "story");
+  elements.appShell.classList.toggle("view-minigame", state.view === "minigame");
 }
 
 function setToolbarHidden(hidden) {
@@ -1057,8 +1564,10 @@ function updateDialogueHeight(value) {
   state.dialogueHeight = clampNumber(Number(value), 28, 52, 38);
   elements.dialogueHeightInput.value = String(state.dialogueHeight);
   elements.dialogueHeightQuickInput.value = String(state.dialogueHeight);
+  elements.storyDialogueHeightInput.value = String(state.dialogueHeight);
   applySceneSizing();
   renderDialogue({ scrollToEnd: true });
+  renderStoryDialogue({ scrollToEnd: true });
   persistState();
 }
 
@@ -1066,6 +1575,7 @@ function updateSpriteScale(value) {
   state.spriteScale = clampNumber(Number(value), 80, 220, 100);
   elements.spriteScaleInput.value = String(state.spriteScale);
   elements.characterSizeQuickInput.value = String(state.spriteScale);
+  elements.storyCharacterSizeInput.value = String(state.spriteScale);
   applySceneSizing();
   persistState();
 }
@@ -1082,6 +1592,7 @@ function showDialogueScrollbar() {
 function updateTextSize(value) {
   state.textSize = clampNumber(Number(value), 85, 200, 103);
   elements.textSizeInput.value = String(state.textSize);
+  elements.storyTextSizeInput.value = String(state.textSize);
   elements.menuTextSizeInput.value = String(state.textSize);
   applySceneSizing();
   persistState();
@@ -1302,6 +1813,61 @@ function getUserLabel() {
 
 function getSelectedCharacter() {
   return state.characters.find((character) => character.id === state.selectedCharacterId) || null;
+}
+
+function getSelectedStory() {
+  return state.storyData[state.selectedStoryId] || null;
+}
+
+function getSelectedStoryCg() {
+  const story = getSelectedStory();
+  if (!story) {
+    return null;
+  }
+
+  return (story.cgs || []).find((cg) => Number(cg.id) === Number(state.selectedStoryCgId)) ||
+    (story.cgs || [])[0] ||
+    null;
+}
+
+function getSelectedStoryConversation() {
+  const storyId = state.selectedStoryId || "__story";
+  const cgId = state.selectedStoryCgId || 1;
+  const key = `${storyId}:${cgId}`;
+  if (!isPlainObject(state.storyConversations[key])) {
+    state.storyConversations[key] = createEmptyConversation();
+  }
+
+  const conversation = state.storyConversations[key];
+  if (!Array.isArray(conversation.messages)) {
+    conversation.messages = [];
+  }
+  if (typeof conversation.draft !== "string") {
+    conversation.draft = "";
+  }
+  if (typeof conversation.pendingAssistantText !== "string") {
+    conversation.pendingAssistantText = "";
+  }
+
+  return conversation;
+}
+
+function getSelectedStoryScores() {
+  const storyId = state.selectedStoryId || "__story";
+  if (!isPlainObject(state.storyScores[storyId])) {
+    state.storyScores[storyId] = { red: 0, black: 0 };
+  }
+
+  return state.storyScores[storyId];
+}
+
+function getLocalizedStoryText(entry) {
+  if (!entry) {
+    return {};
+  }
+
+  const language = getCharacterMetadataLanguage();
+  return entry[language] || entry.english || {};
 }
 
 function getSelectedConversation() {
@@ -1540,6 +2106,7 @@ function updateStatus(_message) {
 function setBusy(busy) {
   state.busy = busy;
   elements.dialogueBox.readOnly = busy;
+  elements.storyDialogueBox.readOnly = busy;
 }
 
 function createStateSnapshot() {
@@ -1561,6 +2128,11 @@ function createStateSnapshot() {
     characterNotes: state.characterNotes,
     characterExpressions: state.characterExpressions,
     characterConversations: state.characterConversations,
+    storyConversations: state.storyConversations,
+    selectedStoryId: state.selectedStoryId,
+    selectedStoryCgId: state.selectedStoryCgId,
+    storyScores: state.storyScores,
+    menuPage: state.menuPage,
     view: state.view,
     toolbarHidden: state.toolbarHidden
   };
@@ -1602,6 +2174,11 @@ function applyPersistedState(parsed) {
   state.characterNotes = isPlainObject(parsed.characterNotes) ? parsed.characterNotes : {};
   state.characterExpressions = isPlainObject(parsed.characterExpressions) ? parsed.characterExpressions : {};
   state.characterConversations = isPlainObject(parsed.characterConversations) ? parsed.characterConversations : {};
+  state.storyConversations = isPlainObject(parsed.storyConversations) ? parsed.storyConversations : {};
+  state.selectedStoryId = typeof parsed.selectedStoryId === "string" ? parsed.selectedStoryId : "";
+  state.selectedStoryCgId = clampNumber(Number(parsed.selectedStoryCgId), 1, 99, 1);
+  state.storyScores = isPlainObject(parsed.storyScores) ? parsed.storyScores : {};
+  state.menuPage = parsed.menuPage === "stories" ? "stories" : "characters";
 
   if (Array.isArray(parsed.messages) || typeof parsed.draft === "string") {
     state.characterConversations[parsed.selectedCharacterId || "__default"] = {
@@ -1617,7 +2194,7 @@ function applyPersistedState(parsed) {
     }
   }
 
-  state.view = parsed.view === "conversation" ? "conversation" : "menu";
+  state.view = ["conversation", "story", "minigame"].includes(parsed.view) ? parsed.view : "menu";
   state.toolbarHidden = Boolean(parsed.toolbarHidden);
 }
 

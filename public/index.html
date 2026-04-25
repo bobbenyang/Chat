@@ -11,13 +11,19 @@
       <aside class="menu-panel" aria-label="Menu">
         <header class="menu-header">
           <div>
-            <p class="eyebrow" data-i18n="charactersEyebrow">Characters</p>
+            <p id="menuEyebrow" class="eyebrow" data-i18n="charactersEyebrow">Characters</p>
             <h1 data-i18n="menuTitle">Menu</h1>
           </div>
           <button id="openMenuSettingsButton" class="button menu-settings-button" type="button" data-i18n="settingsButton">Settings</button>
         </header>
 
+        <nav id="menuPageToggle" class="menu-page-toggle" aria-label="Menu pages">
+          <button class="menu-page-option" type="button" data-menu-page-value="characters" data-i18n="charactersPageButton">Characters</button>
+          <button class="menu-page-option" type="button" data-menu-page-value="stories" data-i18n="storiesPageButton">Stories</button>
+        </nav>
+
         <div id="characterGrid" class="character-grid"></div>
+        <div id="storyGrid" class="character-grid story-grid" hidden></div>
 
       </aside>
 
@@ -234,6 +240,87 @@
             data-i18n-aria-label="dialogueAriaLabel"
           ></textarea>
         </form>
+      </section>
+
+      <section class="story-panel" aria-label="Story">
+        <header class="story-header">
+          <button id="backFromStoryButton" class="button button-ghost" type="button" data-i18n="menuTitle">Menu</button>
+          <div>
+            <p class="eyebrow" data-i18n="storiesPageButton">Stories</p>
+            <h2 id="storyTitle">Mitsui Hisashi</h2>
+          </div>
+          <button id="openStorySettingsButton" class="button button-ghost" type="button" data-i18n="settingsButton">Settings</button>
+        </header>
+
+        <div id="storySettingsModal" class="modal-overlay" hidden>
+          <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="storySettingsTitle">
+            <header class="modal-header">
+              <h2 id="storySettingsTitle" data-i18n="menuSettingsTitle">Settings</h2>
+              <button id="closeStorySettingsButton" class="button button-ghost" type="button" data-i18n="closeButton">Close</button>
+            </header>
+
+            <div class="settings-stack">
+              <label class="field">
+                <span data-i18n="textSizeLabel">Text Size</span>
+                <input id="storyTextSizeInput" type="range" min="85" max="200" step="5" value="103" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="characterPositionLabel">Character Position</span>
+                <input id="storyCharacterPositionInput" type="range" min="-120" max="120" step="2" value="0" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="characterSizeLabel">Character Size</span>
+                <input id="storyCharacterSizeInput" type="range" min="80" max="220" step="5" value="100" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="dialogueHeightLabel">Dialogue Height</span>
+                <input id="storyDialogueHeightInput" type="range" min="28" max="52" step="2" value="38" />
+              </label>
+
+              <label class="field">
+                <span data-i18n="backgroundLabel">Background</span>
+                <div id="storyBackgroundQuickStrip" class="background-strip"></div>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <div class="story-stage">
+          <img id="storyCgImage" class="story-cg-image" src="" alt="" />
+        </div>
+
+        <form id="storyChatForm" class="dialogue-form story-dialogue-form">
+          <div class="story-actions">
+            <button id="storyNextButton" class="button button-primary" type="button" data-i18n="storyNextButton">Next CG</button>
+          </div>
+          <textarea
+            id="storyDialogueBox"
+            class="dialogue-box"
+            spellcheck="true"
+            enterkeyhint="send"
+            aria-label="Story dialogue"
+            data-i18n-aria-label="storyDialogueAriaLabel"
+          ></textarea>
+        </form>
+      </section>
+
+      <section class="minigame-panel" aria-label="Basketball minigame">
+        <header class="minigame-header">
+          <button id="backFromMinigameButton" class="button button-ghost" type="button" data-i18n="storiesPageButton">Stories</button>
+          <div>
+            <p class="eyebrow" data-i18n="storiesPageButton">Stories</p>
+            <h2>Mitsui Hisashi</h2>
+          </div>
+        </header>
+        <iframe
+          id="minigameFrame"
+          class="minigame-frame"
+          title="Mitsui Hisashi Basketball"
+          src="/Minigame/Basketball/index.html"
+        ></iframe>
       </section>
     </main>
 

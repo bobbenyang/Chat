@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "public");
 const charactersDir = path.join(__dirname, "Characters");
 const backgroundsDir = path.join(__dirname, "Background");
+const storiesDir = path.join(__dirname, "Stories");
+const minigameDir = path.join(__dirname, "Minigame");
 
 loadLocalEnv();
 
@@ -444,12 +446,16 @@ async function serveStatic(requestPath, res, isHead = false) {
     absolutePath = path.join(__dirname, decodedPath);
   } else if (decodedPath.startsWith("/Background/")) {
     absolutePath = path.join(__dirname, decodedPath);
+  } else if (decodedPath.startsWith("/Stories/")) {
+    absolutePath = path.join(__dirname, decodedPath);
+  } else if (decodedPath.startsWith("/Minigame/")) {
+    absolutePath = path.join(__dirname, decodedPath);
   } else {
     return sendJson(res, 404, { error: "Not found." });
   }
 
   const normalizedPath = path.normalize(absolutePath);
-  const allowedRoots = [publicDir, charactersDir, backgroundsDir];
+  const allowedRoots = [publicDir, charactersDir, backgroundsDir, storiesDir, minigameDir];
   if (!allowedRoots.some((root) => normalizedPath.startsWith(root))) {
     return sendJson(res, 403, { error: "Forbidden." });
   }

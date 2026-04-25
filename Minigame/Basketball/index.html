@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mitsui Hisashi Basketball</title>
+    <link rel="stylesheet" href="/Minigame/Basketball/styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <div class="score-panel">
+        <div>
+          <p>Red</p>
+          <strong id="redScoreValue">0</strong>
+        </div>
+        <div>
+          <p>Black</p>
+          <strong id="blackScoreValue">0</strong>
+        </div>
+        <button id="resetButton" type="button">Reset</button>
+      </div>
+      <div id="possessionLabel" class="possession-label">Red ball</div>
+      <canvas id="gameCanvas" aria-label="Basketball minigame"></canvas>
+    </main>
+    <script type="module" src="/Minigame/Basketball/game.js"></script>
+  </body>
+</html>
