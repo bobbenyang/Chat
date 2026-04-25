@@ -243,13 +243,20 @@
       </section>
 
       <section class="story-panel" aria-label="Story">
+        <button id="showStoryToolbarButton" class="story-toolbar-show-button button button-ghost" type="button" data-i18n="showButton">Show</button>
         <header class="story-header">
           <button id="backFromStoryButton" class="button button-ghost" type="button" data-i18n="menuTitle">Menu</button>
-          <div>
-            <p class="eyebrow" data-i18n="storiesPageButton">Stories</p>
-            <h2 id="storyTitle">Mitsui Hisashi</h2>
+          <div class="story-title">
+            <button id="hideStoryToolbarButton" class="toolbar-hide-button" type="button" aria-label="Hide top menu" data-i18n="hideButton" data-i18n-aria-label="hideTopMenuLabel">Hide</button>
+            <div>
+              <p class="eyebrow" data-i18n="storiesPageButton">Stories</p>
+              <h2 id="storyTitle">Mitsui Hisashi</h2>
+            </div>
           </div>
-          <button id="openStorySettingsButton" class="button button-ghost" type="button" data-i18n="settingsButton">Settings</button>
+          <div class="header-actions">
+            <button id="openStorySettingsButton" class="button button-ghost" type="button" data-i18n="settingsButton">Settings</button>
+            <button id="clearStoryButton" class="button button-ghost" type="button" data-i18n="clearButton">Clear</button>
+          </div>
         </header>
 
         <div id="storySettingsModal" class="modal-overlay" hidden>

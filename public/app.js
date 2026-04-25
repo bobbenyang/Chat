@@ -239,7 +239,10 @@ const elements = {
   dialogueBox: document.querySelector("#dialogueBox"),
   backFromMinigameButton: document.querySelector("#backFromMinigameButton"),
   backFromStoryButton: document.querySelector("#backFromStoryButton"),
+  hideStoryToolbarButton: document.querySelector("#hideStoryToolbarButton"),
+  showStoryToolbarButton: document.querySelector("#showStoryToolbarButton"),
   openStorySettingsButton: document.querySelector("#openStorySettingsButton"),
+  clearStoryButton: document.querySelector("#clearStoryButton"),
   storySettingsModal: document.querySelector("#storySettingsModal"),
   closeStorySettingsButton: document.querySelector("#closeStorySettingsButton"),
   storyTextSizeInput: document.querySelector("#storyTextSizeInput"),
@@ -294,6 +297,7 @@ const state = {
   editingCharacterId: "",
   view: "menu",
   toolbarHidden: false,
+  storyToolbarHidden: false,
   busy: false
 };
 
@@ -509,7 +513,10 @@ function bindEvents() {
   });
   elements.historyFileInput.addEventListener("change", importHistoryFile);
   elements.backFromStoryButton.addEventListener("click", () => setView("menu"));
+  elements.hideStoryToolbarButton.addEventListener("click", () => setStoryToolbarHidden(true));
+  elements.showStoryToolbarButton.addEventListener("click", () => setStoryToolbarHidden(false));
   elements.openStorySettingsButton.addEventListener("click", openStorySettings);
+  elements.clearStoryButton.addEventListener("click", clearStory);
   elements.closeStorySettingsButton.addEventListener("click", closeStorySettings);
   elements.storySettingsModal.addEventListener("pointerdown", closeStorySettingsOnOutsideClick);
   elements.backFromMinigameButton.addEventListener("click", () => setView("story"));
@@ -828,6 +835,7 @@ function render() {
   renderDialogue({ scrollToEnd: true });
   renderView();
   renderToolbar();
+  renderStoryToolbar();
 }
 
 function applyTranslations() {
@@ -1257,6 +1265,27 @@ function advanceStoryFromButton() {
   }
 }
 
+function clearStory() {
+  const story = getSelectedStory();
+  if (!story) {
+    return;
+  }
+
+  const prefix = `${state.selectedStoryId}:`;
+  for (const key of Object.keys(state.storyConversations)) {
+    if (key.startsWith(prefix)) {
+      delete state.storyConversations[key];
+    }
+  }
+
+  state.selectedStoryCgId = 1;
+  state.storyScores[state.selectedStoryId] = { red: 0, black: 0 };
+  resetMinigame();
+  persistState();
+  renderStory();
+  moveCaretToStoryDialogueEnd();
+}
+
 function handleMinigameMessage(event) {
   if (event.source !== elements.minigameFrame.contentWindow || !isPlainObject(event.data)) {
     return;
@@ -1527,6 +1556,16 @@ function setToolbarHidden(hidden) {
 
 function renderToolbar() {
   elements.appShell.classList.toggle("toolbar-hidden", state.toolbarHidden);
+}
+
+function setStoryToolbarHidden(hidden) {
+  state.storyToolbarHidden = hidden;
+  persistState();
+  renderStoryToolbar();
+}
+
+function renderStoryToolbar() {
+  elements.appShell.classList.toggle("story-toolbar-hidden", state.storyToolbarHidden);
 }
 
 function renderThemeToggle() {
@@ -2134,7 +2173,8 @@ function createStateSnapshot() {
     storyScores: state.storyScores,
     menuPage: state.menuPage,
     view: state.view,
-    toolbarHidden: state.toolbarHidden
+    toolbarHidden: state.toolbarHidden,
+    storyToolbarHidden: state.storyToolbarHidden
   };
 }
 
@@ -2196,6 +2236,7 @@ function applyPersistedState(parsed) {
 
   state.view = ["conversation", "story", "minigame"].includes(parsed.view) ? parsed.view : "menu";
   state.toolbarHidden = Boolean(parsed.toolbarHidden);
+  state.storyToolbarHidden = Boolean(parsed.storyToolbarHidden);
 }
 
 function isPlainObject(value) {
