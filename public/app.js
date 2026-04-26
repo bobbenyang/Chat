@@ -36,6 +36,11 @@ const TRANSLATIONS = {
     storyReturnToGameButton: "Return to Game",
     storyEndingButton: "Ending Reached",
     storyDialogueAriaLabel: "Story dialogue",
+    loginTitle: "Login",
+    usernameLabel: "Username",
+    passwordLabel: "Password",
+    loginButton: "Login",
+    loginFailed: "Login failed.",
     settingsButton: "Settings",
     menuSettingsTitle: "Settings",
     closeButton: "Close",
@@ -115,6 +120,11 @@ const TRANSLATIONS = {
     storyReturnToGameButton: "返回游戏",
     storyEndingButton: "已到达结局",
     storyDialogueAriaLabel: "故事对话",
+    loginTitle: "登录",
+    usernameLabel: "用户名",
+    passwordLabel: "密码",
+    loginButton: "登录",
+    loginFailed: "登录失败。",
     settingsButton: "设置",
     menuSettingsTitle: "设置",
     closeButton: "关闭",
@@ -186,6 +196,12 @@ const TRANSLATIONS = {
 
 const elements = {
   appShell: document.querySelector("#appShell"),
+  loginOverlay: document.querySelector("#loginOverlay"),
+  loginForm: document.querySelector("#loginForm"),
+  loginUsername: document.querySelector("#loginUsername"),
+  loginPassword: document.querySelector("#loginPassword"),
+  loginError: document.querySelector("#loginError"),
+  loginButton: document.querySelector("#loginButton"),
   menuEyebrow: document.querySelector("#menuEyebrow"),
   characterGrid: document.querySelector("#characterGrid"),
   storyGrid: document.querySelector("#storyGrid"),
@@ -293,6 +309,9 @@ const state = {
   selectedStoryId: "",
   selectedStoryCgId: 1,
   storyScores: {},
+  authEnabled: false,
+  authenticated: false,
+  username: "",
   menuPage: "characters",
   editingCharacterId: "",
   view: "menu",
@@ -314,8 +333,11 @@ async function bootstrap() {
   await loadCharacters();
   await loadBackgrounds();
   await loadPersistedStory();
+  await refreshAuthStatus();
   render();
-  await connectToNovelAi();
+  if (state.authenticated || !state.authEnabled) {
+    await connectToNovelAi();
+  }
 }
 
 async function loadPersistedStory() {
@@ -340,6 +362,7 @@ async function loadPersistedStory() {
 }
 
 function bindEvents() {
+  elements.loginForm.addEventListener("submit", login);
   elements.languageToggle.addEventListener("click", (event) => {
     const button = event.target.closest("[data-language-value]");
     if (!button) {
@@ -521,6 +544,42 @@ function bindEvents() {
   elements.storySettingsModal.addEventListener("pointerdown", closeStorySettingsOnOutsideClick);
   elements.backFromMinigameButton.addEventListener("click", () => setView("story"));
   window.addEventListener("message", handleMinigameMessage);
+}
+
+async function refreshAuthStatus() {
+  try {
+    const response = await fetch("/api/auth/status");
+    const payload = await response.json();
+    state.authEnabled = Boolean(payload.authEnabled);
+    state.authenticated = !state.authEnabled || Boolean(payload.authenticated);
+    state.username = payload.username || "";
+  } catch {
+    state.authEnabled = false;
+    state.authenticated = true;
+  }
+}
+
+async function login(event) {
+  event.preventDefault();
+  elements.loginButton.disabled = true;
+  elements.loginError.hidden = true;
+
+  try {
+    const payload = await postJson("/api/auth/login", {
+      username: elements.loginUsername.value,
+      password: elements.loginPassword.value
+    });
+    state.authenticated = true;
+    state.username = payload.username || elements.loginUsername.value;
+    elements.loginPassword.value = "";
+    renderAuth();
+    await connectToNovelAi();
+  } catch (error) {
+    elements.loginError.textContent = error.message || getTranslation().loginFailed;
+    elements.loginError.hidden = false;
+  } finally {
+    elements.loginButton.disabled = false;
+  }
 }
 
 async function loadCharacters() {
@@ -841,6 +900,7 @@ function render() {
   renderView();
   renderToolbar();
   renderStoryToolbar();
+  renderAuth();
 }
 
 function applyTranslations() {
@@ -895,6 +955,14 @@ function renderModelOptions() {
 
 function renderTemperatureValue() {
   elements.temperatureValue.textContent = state.temperature.toFixed(1);
+}
+
+function renderAuth() {
+  const shouldLogin = state.authEnabled && !state.authenticated;
+  elements.loginOverlay.hidden = !shouldLogin;
+  if (shouldLogin) {
+    elements.loginUsername.focus();
+  }
 }
 
 function renderBackgroundStrip() {

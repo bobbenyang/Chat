@@ -362,6 +362,19 @@ textarea {
   line-height: 1.5;
 }
 
+.auth-overlay {
+  z-index: 80;
+}
+
+.auth-panel {
+  grid-template-rows: auto auto auto;
+}
+
+.auth-error {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
 .modal-panel .settings-stack {
   min-height: 0;
   overflow: visible;

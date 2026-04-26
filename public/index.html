@@ -8,6 +8,32 @@
   </head>
   <body>
     <main id="appShell" class="app-shell view-menu">
+      <div id="loginOverlay" class="modal-overlay auth-overlay" hidden>
+        <form id="loginForm" class="modal-panel modal-panel-narrow auth-panel">
+          <header class="modal-header">
+            <h2 data-i18n="loginTitle">Login</h2>
+          </header>
+
+          <div class="settings-stack">
+            <label class="field">
+              <span data-i18n="usernameLabel">Username</span>
+              <input id="loginUsername" type="text" autocomplete="username" required />
+            </label>
+
+            <label class="field">
+              <span data-i18n="passwordLabel">Password</span>
+              <input id="loginPassword" type="password" autocomplete="current-password" required />
+            </label>
+
+            <p id="loginError" class="modal-body-text auth-error" hidden></p>
+          </div>
+
+          <footer class="modal-footer">
+            <button id="loginButton" class="button button-primary" type="submit" data-i18n="loginButton">Login</button>
+          </footer>
+        </form>
+      </div>
+
       <aside class="menu-panel" aria-label="Menu">
         <header class="menu-header">
           <div>

@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createHmac, pbkdf2Sync, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
@@ -11,6 +12,7 @@ const charactersDir = path.join(__dirname, "Characters");
 const backgroundsDir = path.join(__dirname, "Background");
 const storiesDir = path.join(__dirname, "Stories");
 const minigameDir = path.join(__dirname, "Minigame");
+const accountsPath = path.join(__dirname, "Accounts", "users.json");
 
 loadLocalEnv();
 
@@ -26,6 +28,9 @@ const DEFAULT_MODEL_LIST = [
 const GLM_MODELS = parseConfiguredModels(process.env.GLM_MODELS, GLM_DEFAULT_MODEL);
 const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
 const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 60000);
+const SESSION_COOKIE_NAME = "chat_session";
+const SESSION_MAX_AGE_SECONDS = Number(process.env.SESSION_MAX_AGE_SECONDS || 60 * 60 * 24 * 7);
+const ACCOUNTS = loadAccounts();
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -38,16 +43,47 @@ const MIME_TYPES = {
 };
 
 createServer(async (req, res) => {
+  const requestInfo = getRequestInfo(req);
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
     const isHead = req.method === "HEAD";
 
+    if (url.pathname === "/api/auth/status" && req.method === "GET") {
+      const session = getAuthSession(req);
+      return sendJson(res, 200, {
+        authEnabled: isAuthEnabled(),
+        authenticated: Boolean(session),
+        username: session?.username || ""
+      });
+    }
+
+    if (url.pathname === "/api/auth/login" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      const account = verifyAccount(body.username, body.password);
+      if (!account) {
+        logRequest(req, requestInfo, "auth failed", { username: sanitizeLogValue(body.username) });
+        return sendJson(res, 401, { error: "Invalid username or password." });
+      }
+
+      setSessionCookie(res, account.username);
+      logRequest(req, requestInfo, "auth login", { username: account.username });
+      return sendJson(res, 200, { ok: true, username: account.username });
+    }
+
+    if (url.pathname === "/api/auth/logout" && req.method === "POST") {
+      clearSessionCookie(res);
+      logRequest(req, requestInfo, "auth logout");
+      return sendJson(res, 200, { ok: true });
+    }
+
     if (url.pathname === "/api/models" && req.method === "POST") {
+      requireAuth(req);
       const models = await fetchModels();
       return sendJson(res, 200, { models });
     }
 
     if (url.pathname === "/api/test" && req.method === "POST") {
+      requireAuth(req);
       const models = await fetchModels();
       return sendJson(res, 200, {
         ok: true,
@@ -57,13 +93,15 @@ createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/status" && req.method === "GET") {
+      requireAuth(req);
       return sendJson(res, 200, {
         hasGlmKey: Boolean(getGlmApiKey({ throwIfMissing: false }))
       });
     }
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
-      console.log(`[${new Date().toISOString()}] POST /api/chat`);
+      const session = requireAuth(req);
+      logRequest(req, requestInfo, "chat", { username: session.username });
       const body = await readJsonBody(req);
       validateChatRequest(body);
       await streamChatReply(body, res);
@@ -89,7 +127,7 @@ createServer(async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     console.error(
-      `[${new Date().toISOString()}] ${req.method} ${req.url} failed with ${status}: ${error.stack || error.message || error}`
+      `[${new Date().toISOString()}] ${req.method} ${req.url} failed with ${status} ip=${requestInfo.ip} ua="${requestInfo.userAgent}" ref="${requestInfo.referer}": ${error.stack || error.message || error}`
     );
     return sendJson(res, status, {
       error: error.message || "Unexpected server error."
@@ -900,13 +938,240 @@ function summarizePayload(payload) {
   }
 }
 
+function isAuthEnabled() {
+  return ACCOUNTS.length > 0;
+}
+
+function requireAuth(req) {
+  if (!isAuthEnabled()) {
+    return { username: "local" };
+  }
+
+  const session = getAuthSession(req);
+  if (!session) {
+    throw createHttpError(401, "Login required.");
+  }
+
+  return session;
+}
+
+function loadAccounts() {
+  const raw = process.env.CHAT_USERS_JSON || readOptionalFile(accountsPath);
+  if (!raw) {
+    console.warn("No chat accounts configured. API routes are unprotected until CHAT_USERS_JSON or Accounts/users.json is added.");
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    const users = Array.isArray(parsed?.users) ? parsed.users : [];
+    return users
+      .map(normalizeAccount)
+      .filter(Boolean);
+  } catch (error) {
+    console.warn(`Could not parse chat accounts: ${error.message}`);
+    return [];
+  }
+}
+
+function readOptionalFile(filePath) {
+  try {
+    return readFileSync(filePath, "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.warn(`Could not read ${filePath}: ${error.message}`);
+    }
+    return "";
+  }
+}
+
+function normalizeAccount(account) {
+  const username = typeof account?.username === "string" ? account.username.trim() : "";
+  const salt = typeof account?.salt === "string" ? account.salt.trim() : "";
+  const passwordHash = typeof account?.passwordHash === "string" ? account.passwordHash.trim() : "";
+  const iterations = Number(account?.iterations || 210000);
+  if (!username || !salt || !passwordHash || !Number.isFinite(iterations)) {
+    return null;
+  }
+
+  return { username, salt, passwordHash, iterations };
+}
+
+function verifyAccount(username, password) {
+  const normalizedUsername = typeof username === "string" ? username.trim() : "";
+  const rawPassword = typeof password === "string" ? password : "";
+  if (!normalizedUsername || !rawPassword) {
+    return null;
+  }
+
+  const account = ACCOUNTS.find((entry) => entry.username === normalizedUsername);
+  if (!account) {
+    return null;
+  }
+
+  const derived = pbkdf2Sync(rawPassword, account.salt, account.iterations, 32, "sha256").toString("base64");
+  if (!safeEqual(derived, account.passwordHash)) {
+    return null;
+  }
+
+  return account;
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function getAuthSession(req) {
+  if (!isAuthEnabled()) {
+    return { username: "local" };
+  }
+
+  const token = readCookie(req, SESSION_COOKIE_NAME);
+  if (!token) {
+    return null;
+  }
+
+  const [encodedPayload, signature] = token.split(".");
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = signSessionPayload(encodedPayload);
+  if (!safeEqual(signature, expectedSignature)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    if (!payload.username || Number(payload.expiresAt) < Date.now()) {
+      return null;
+    }
+
+    if (!ACCOUNTS.some((account) => account.username === payload.username)) {
+      return null;
+    }
+
+    return { username: payload.username };
+  } catch {
+    return null;
+  }
+}
+
+function setSessionCookie(res, username) {
+  const payload = Buffer.from(JSON.stringify({
+    username,
+    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000
+  })).toString("base64url");
+  const token = `${payload}.${signSessionPayload(payload)}`;
+  res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: "Lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_MAX_AGE_SECONDS
+  }));
+}
+
+function clearSessionCookie(res) {
+  res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "Lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0
+  }));
+}
+
+function signSessionPayload(payload) {
+  return createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
+}
+
+function getSessionSecret() {
+  return process.env.SESSION_SECRET || process.env.OPENROUTER_API_KEY || process.env.GLM_API_KEY || process.env.GLM_API || "development-session-secret";
+}
+
+function readCookie(req, name) {
+  const rawCookie = req.headers.cookie || "";
+  for (const part of rawCookie.split(";")) {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = part.slice(0, separatorIndex).trim();
+    if (key === name) {
+      return decodeURIComponent(part.slice(separatorIndex + 1).trim());
+    }
+  }
+
+  return "";
+}
+
+function serializeCookie(name, value, options = {}) {
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+  if (options.maxAge !== undefined) {
+    parts.push(`Max-Age=${options.maxAge}`);
+  }
+  if (options.path) {
+    parts.push(`Path=${options.path}`);
+  }
+  if (options.httpOnly) {
+    parts.push("HttpOnly");
+  }
+  if (options.secure) {
+    parts.push("Secure");
+  }
+  if (options.sameSite) {
+    parts.push(`SameSite=${options.sameSite}`);
+  }
+  return parts.join("; ");
+}
+
+function getRequestInfo(req) {
+  return {
+    ip: getClientIp(req),
+    userAgent: sanitizeLogValue(req.headers["user-agent"]),
+    referer: sanitizeLogValue(req.headers.referer || req.headers.referrer)
+  };
+}
+
+function getClientIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return sanitizeLogValue(forwarded || req.socket.remoteAddress || "");
+}
+
+function sanitizeLogValue(value) {
+  return String(value || "").replace(/[\r\n"]/g, " ").slice(0, 240);
+}
+
+function logRequest(req, requestInfo, action, extra = {}) {
+  const extraText = Object.entries(extra)
+    .map(([key, value]) => `${key}="${sanitizeLogValue(value)}"`)
+    .join(" ");
+  console.log(
+    `[${new Date().toISOString()}] ${req.method} ${req.url} ${action} ip=${requestInfo.ip} ua="${requestInfo.userAgent}" ref="${requestInfo.referer}"${extraText ? ` ${extraText}` : ""}`
+  );
+}
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
 
 function createHttpError(statusCode, message) {
-  const error = new Error(message);
+  const error = new Error(summarizeErrorMessage(message));
   error.statusCode = statusCode;
   return error;
+}
+
+function summarizeErrorMessage(message) {
+  const text = String(message || "Unexpected server error.");
+  const title = text.match(/<title>([^<]+)<\/title>/i)?.[1];
+  if (title) {
+    return title.trim().slice(0, 500);
+  }
+
+  return text.replace(/\s+/g, " ").trim().slice(0, 500);
 }

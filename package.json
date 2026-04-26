@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "debug": "node --inspect server.js"
+    "debug": "node --inspect server.js",
+    "create-user": "node scripts/create-user.js"
   }
 }
