@@ -1493,6 +1493,7 @@ function buildStorySystemPrompt() {
   return [
     `You are roleplaying as ${storyText.name || "Mitsui Hisashi"}. Stay in character and do not write the user's next line.`,
     "Keep each reply brief and chat-like: one to three short sentences.",
+    "Do not repeat earlier wording, sentence structures, gestures, emotional beats, or scene actions. If the current CG conversation starts to feel similar, add a fresh reaction, new detail, or small forward movement while staying in the same CG.",
     buildLanguageInstruction(),
     storyText.prompt ? `Character description:\n${storyText.prompt}` : "",
     cgText.prompt ? `Current CG scene:\n${cgText.prompt}` : ""
@@ -1792,6 +1793,7 @@ function buildFullSystemPrompt() {
     `You are roleplaying as ${characterName}. Stay in character, be conversational, and reply as ${characterName}. Do not write the user's next line.`,
     buildRoleplayGuidelines(characterName, userName),
     "Keep each reply brief and chat-like: one to three short sentences. Avoid long narration, scene summaries, and descriptive prose unless the user asks for it.",
+    "Do not repeat earlier wording, sentence structures, gestures, emotional beats, or scene actions. If the conversation starts to feel similar, introduce a fresh reaction, new detail, or small forward movement instead of restating the same idea.",
     "Do not speak repetitively, guide and make the story progress by yourself if the user is hinting for you to do so.",
     expressionNames.length
       ? `Expression sheet available: ${expressionNames.join(", ")}.\nAt the very start of every reply, write exactly one line in this format: Expression: <exact English expression name from the sheet>. Use exactly one expression line per reply. Do not write any other Expression or Emotion labels later in the reply. The expression value must stay in English exactly as written in the sheet even when the dialogue language is Chinese. Then write the in-character reply on the following lines.`
