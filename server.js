@@ -46,7 +46,6 @@ const MIME_TYPES = {
 };
 
 createServer(async (req, res) => {
-  const requestInfo = getRequestInfo(req);
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
     const isHead = req.method === "HEAD";
@@ -64,18 +63,18 @@ createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const account = verifyAccount(body.username, body.password);
       if (!account) {
-        logRequest(req, requestInfo, "auth failed", { username: sanitizeLogValue(body.username) });
+        logRequest(req, "auth failed", { username: sanitizeLogValue(body.username) });
         return sendJson(res, 401, { error: "Invalid username or password." });
       }
 
       setSessionCookie(res, account.username);
-      logRequest(req, requestInfo, "auth login", { username: account.username });
+      logRequest(req, "auth login", { username: account.username });
       return sendJson(res, 200, { ok: true, username: account.username });
     }
 
     if (url.pathname === "/api/auth/logout" && req.method === "POST") {
       clearSessionCookie(res);
-      logRequest(req, requestInfo, "auth logout");
+      logRequest(req, "auth logout");
       return sendJson(res, 200, { ok: true });
     }
 
@@ -104,7 +103,7 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
       const session = requireAuth(req);
-      logRequest(req, requestInfo, "chat", { username: session.username });
+      logRequest(req, "chat", { username: session.username });
       const body = await readJsonBody(req);
       validateChatRequest(body);
       await streamChatReply(body, res);
@@ -130,7 +129,7 @@ createServer(async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     console.error(
-      `[${new Date().toISOString()}] ${req.method} ${req.url} failed with ${status} ip=${requestInfo.ip} ua="${requestInfo.userAgent}" ref="${requestInfo.referer}": ${error.stack || error.message || error}`
+      `[${new Date().toISOString()}] ${req.method} ${req.url} failed with ${status}: ${error.stack || error.message || error}`
     );
     return sendJson(res, status, {
       error: error.message || "Unexpected server error."
@@ -1132,29 +1131,16 @@ function serializeCookie(name, value, options = {}) {
   return parts.join("; ");
 }
 
-function getRequestInfo(req) {
-  return {
-    ip: getClientIp(req),
-    userAgent: sanitizeLogValue(req.headers["user-agent"]),
-    referer: sanitizeLogValue(req.headers.referer || req.headers.referrer)
-  };
-}
-
-function getClientIp(req) {
-  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  return sanitizeLogValue(forwarded || req.socket.remoteAddress || "");
-}
-
 function sanitizeLogValue(value) {
   return String(value || "").replace(/[\r\n"]/g, " ").slice(0, 240);
 }
 
-function logRequest(req, requestInfo, action, extra = {}) {
+function logRequest(req, action, extra = {}) {
   const extraText = Object.entries(extra)
     .map(([key, value]) => `${key}="${sanitizeLogValue(value)}"`)
     .join(" ");
   console.log(
-    `[${new Date().toISOString()}] ${req.method} ${req.url} ${action} ip=${requestInfo.ip} ua="${requestInfo.userAgent}" ref="${requestInfo.referer}"${extraText ? ` ${extraText}` : ""}`
+    `[${new Date().toISOString()}] ${req.method} ${req.url} ${action}${extraText ? ` ${extraText}` : ""}`
   );
 }
 
