@@ -33,6 +33,7 @@ const SESSION_MAX_AGE_SECONDS = Number(process.env.SESSION_MAX_AGE_SECONDS || 60
 const AUTH_REQUIRED = process.env.AUTH_REQUIRED === "true" ||
   process.env.NODE_ENV === "production" ||
   Boolean(process.env.RENDER);
+const LOG_CHAT_MESSAGE_MAX_CHARS = Number(process.env.LOG_CHAT_MESSAGE_MAX_CHARS || 4000);
 const ACCOUNTS = loadAccounts();
 
 const MIME_TYPES = {
@@ -103,9 +104,13 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
       const session = requireAuth(req);
-      logRequest(req, "chat", { username: session.username });
       const body = await readJsonBody(req);
       validateChatRequest(body);
+      logRequest(req, "chat", {
+        username: session.username,
+        ua: req.headers["user-agent"] || "",
+        message: getLatestUserMessage(body)
+      });
       await streamChatReply(body, res);
       return;
     }
@@ -648,6 +653,20 @@ function validateChatRequest(body) {
   }
 }
 
+function getLatestUserMessage(body) {
+  if (!Array.isArray(body?.messages)) {
+    return "";
+  }
+
+  for (const message of [...body.messages].reverse()) {
+    if (message?.role === "user" && typeof message.content === "string") {
+      return message.content;
+    }
+  }
+
+  return "";
+}
+
 function extractAssistantText(payload) {
   if (!payload) {
     return "";
@@ -1132,12 +1151,19 @@ function serializeCookie(name, value, options = {}) {
 }
 
 function sanitizeLogValue(value) {
-  return String(value || "").replace(/[\r\n"]/g, " ").slice(0, 240);
+  return String(value || "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+}
+
+function formatLogValue(key, value) {
+  const maxLength = key === "message" ? LOG_CHAT_MESSAGE_MAX_CHARS : 240;
+  const text = sanitizeLogValue(value).slice(0, maxLength);
+  const suffix = sanitizeLogValue(value).length > maxLength ? "...[truncated]" : "";
+  return JSON.stringify(`${text}${suffix}`);
 }
 
 function logRequest(req, action, extra = {}) {
   const extraText = Object.entries(extra)
-    .map(([key, value]) => `${key}="${sanitizeLogValue(value)}"`)
+    .map(([key, value]) => `${key}=${formatLogValue(key, value)}`)
     .join(" ");
   console.log(
     `[${new Date().toISOString()}] ${req.method} ${req.url} ${action}${extraText ? ` ${extraText}` : ""}`
