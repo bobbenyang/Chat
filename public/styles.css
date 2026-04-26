@@ -728,7 +728,7 @@ textarea:focus {
 }
 
 .story-toolbar-hidden .story-header {
-  display: none;
+  visibility: hidden;
   pointer-events: none;
 }
 
@@ -743,14 +743,6 @@ textarea:focus {
 
 .story-toolbar-hidden .story-toolbar-show-button {
   display: block;
-}
-
-.story-toolbar-hidden {
-  --story-header-space: 0rem;
-}
-
-.story-toolbar-hidden .story-panel {
-  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .minigame-header h2,
@@ -790,15 +782,14 @@ textarea:focus {
   place-items: center;
   min-height: 0;
   padding: 0.75rem 1rem;
-  overflow: hidden;
 }
 
 .story-cg-image {
   display: block;
   width: auto;
-  height: 100%;
-  max-width: min(100%, calc(100dvw - 2rem));
-  max-height: 100%;
+  height: auto;
+  max-width: min(100%, calc(100dvh - var(--dialogue-height) - 6.75rem));
+  max-height: min(100%, calc(100dvw - 2rem));
   aspect-ratio: 1;
   border-radius: 8px;
   object-fit: contain;
