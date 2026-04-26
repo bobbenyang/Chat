@@ -570,8 +570,13 @@ async function sendMessage(event) {
   syncDraftFromDialogue();
 
   const conversation = getSelectedConversation();
-  const content = conversation.draft.trim();
+  const expressionCommandResult = applyExpressionCommands(conversation.draft);
+  const content = expressionCommandResult.content.trim();
   if (!content || state.busy) {
+    if (expressionCommandResult.changed) {
+      conversation.draft = content;
+      persistState();
+    }
     renderDialogue({ scrollToEnd: true });
     return;
   }
@@ -1987,6 +1992,29 @@ function setCharacterExpression(characterId, expressionName) {
 
   state.characterExpressions[characterId] = expression.id;
   renderCharacter();
+  return true;
+}
+
+function applyExpressionCommands(text) {
+  let changed = false;
+  let nextText = String(text || "");
+  const commandPattern = /<\s*(?:expression|emotion)\s*:?\s*([^>]+?)\s*>/gi;
+  const matches = [...nextText.matchAll(commandPattern)];
+
+  for (const match of matches.reverse()) {
+    const expressionName = findKnownExpressionName(match[1]);
+    if (!expressionName) {
+      continue;
+    }
+
+    changed = setCharacterExpression(state.selectedCharacterId, expressionName) || changed;
+    nextText = `${nextText.slice(0, match.index)}${nextText.slice(match.index + match[0].length)}`;
+  }
+
+  return {
+    changed,
+    content: nextText.replace(/[ \t]{2,}/g, " ").trim()
+  };
 }
 
 function parseExpressionReply(reply) {
