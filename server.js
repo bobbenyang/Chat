@@ -30,6 +30,9 @@ const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 5500
 const GLM_STREAM_CONNECT_TIMEOUT_MS = Number(process.env.GLM_STREAM_CONNECT_TIMEOUT_MS || 60000);
 const SESSION_COOKIE_NAME = "chat_session";
 const SESSION_MAX_AGE_SECONDS = Number(process.env.SESSION_MAX_AGE_SECONDS || 60 * 60 * 24 * 7);
+const AUTH_REQUIRED = process.env.AUTH_REQUIRED === "true" ||
+  process.env.NODE_ENV === "production" ||
+  Boolean(process.env.RENDER);
 const ACCOUNTS = loadAccounts();
 
 const MIME_TYPES = {
@@ -939,7 +942,7 @@ function summarizePayload(payload) {
 }
 
 function isAuthEnabled() {
-  return ACCOUNTS.length > 0;
+  return AUTH_REQUIRED || ACCOUNTS.length > 0;
 }
 
 function requireAuth(req) {
