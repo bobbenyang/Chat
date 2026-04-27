@@ -481,10 +481,13 @@ textarea {
   overflow-x: auto;
   padding-bottom: 0.3rem;
   scroll-snap-type: x proximity;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .background-card {
   display: grid;
+  flex: 0 0 auto;
   border: 1px solid rgba(255, 248, 237, 0.16);
   border-radius: 8px;
   padding: 0.4rem;

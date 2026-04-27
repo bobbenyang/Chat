@@ -531,6 +531,9 @@ function bindEvents() {
 
     applyRelationshipPreset(button.dataset.presetId);
   });
+  elements.backgroundStrip.addEventListener("click", handleBackgroundStripClick);
+  elements.backgroundQuickStrip.addEventListener("click", handleBackgroundStripClick);
+  elements.storyBackgroundQuickStrip.addEventListener("click", handleBackgroundStripClick);
   elements.firstLinePrompt.addEventListener("input", () => {
     updateCharacterNotes(state.editingCharacterId, { firstLine: elements.firstLinePrompt.value });
     renderDialogue({ scrollToEnd: true });
@@ -1033,16 +1036,34 @@ function renderBackgroundCards(container) {
     image.alt = background.name;
 
     button.append(image);
-    button.addEventListener("click", () => selectBackground(background.id));
+    button.dataset.backgroundId = background.id;
     container.append(button);
   }
+}
+
+function handleBackgroundStripClick(event) {
+  const button = event.target.closest("[data-background-id]");
+  if (!button) {
+    return;
+  }
+
+  event.preventDefault();
+  selectBackground(button.dataset.backgroundId);
 }
 
 function selectBackground(backgroundId) {
   state.selectedBackgroundId = backgroundId;
   persistState();
   applySceneSizing();
-  renderBackgroundStrip();
+  updateSelectedBackgroundCards();
+}
+
+function updateSelectedBackgroundCards() {
+  for (const button of document.querySelectorAll("[data-background-id]")) {
+    const isSelected = button.dataset.backgroundId === state.selectedBackgroundId;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  }
 }
 
 function openMenuSettings() {
