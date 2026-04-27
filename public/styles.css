@@ -234,8 +234,16 @@ textarea {
 
 .character-settings-button.button-ghost {
   color: var(--menu-ink);
-  background: var(--menu-bg);
+  background: color-mix(in srgb, var(--menu-bg) 78%, transparent);
+  opacity: 0.72;
   box-shadow: -0.35rem 0 0.6rem var(--menu-bg);
+}
+
+.character-settings-button.button-ghost:hover,
+.character-settings-button.button-ghost:focus-visible,
+.history-rename-button:hover,
+.history-rename-button:focus-visible {
+  opacity: 1;
 }
 
 .menu-settings-button {
@@ -258,7 +266,7 @@ textarea {
   z-index: 6;
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   align-self: stretch;
   border: 1px solid var(--menu-border);
   border-radius: 8px;
@@ -268,12 +276,153 @@ textarea {
 }
 
 .menu-page-option {
+  display: grid;
+  place-items: center;
+  align-items: center;
+  justify-items: center;
   min-height: 2.75rem;
   border: 0;
+  padding: 0.55rem;
   color: var(--menu-ink);
   background: transparent;
   cursor: pointer;
   font-weight: 800;
+  line-height: 1;
+}
+
+.button-icon {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.menu-page-option .button-icon,
+.icon-button .button-icon {
+  margin: auto;
+}
+
+.menu-page-option.is-active .button-icon,
+.menu-settings-button .button-icon {
+  filter: brightness(0) invert(1);
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  align-items: center;
+  justify-items: center;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.55rem;
+  line-height: 1;
+}
+
+.button.icon-button {
+  padding: 0;
+}
+
+.button.icon-button .button-icon {
+  width: 1.45rem;
+  height: 1.45rem;
+  align-self: center;
+  justify-self: center;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.history-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.history-empty {
+  margin: 0;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--muted);
+  background: var(--menu-card);
+  font-weight: 800;
+}
+
+.history-row {
+  display: grid;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 5rem;
+}
+
+.history-resume-button {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  padding: 0.55rem 3.45rem 0.55rem 0.55rem;
+  color: var(--menu-ink);
+  background: var(--menu-card);
+  cursor: pointer;
+  text-align: left;
+}
+
+.history-resume-button img {
+  display: block;
+  width: 4rem;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--menu-card);
+}
+
+.history-resume-button div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.history-resume-button strong,
+.history-resume-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-resume-button strong {
+  font-size: calc(var(--ui-font-size) * 1.02);
+}
+
+.history-resume-button span {
+  color: var(--muted);
+  font-size: calc(var(--ui-font-size) * 0.82);
+  font-weight: 800;
+}
+
+.history-rename-button {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  min-height: 2.35rem;
+  width: 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  transform: translateY(-50%);
+  opacity: 0.72;
 }
 
 .menu-page-option.is-active {
@@ -386,7 +535,8 @@ textarea {
   padding-right: 0.3rem;
 }
 
-#conversationSettingsModal .settings-stack {
+#conversationSettingsModal .settings-stack,
+#historySettingsModal .settings-stack {
   overflow-y: auto;
   padding-right: 0.3rem;
 }
@@ -811,6 +961,10 @@ textarea:focus {
   object-fit: contain;
   background: rgba(33, 25, 21, 0.08);
   box-shadow: var(--shadow);
+}
+
+.app-shell[data-story-layout="square-cg"] .story-cg-image {
+  aspect-ratio: 1;
 }
 
 .story-dialogue-form {

@@ -1,6 +1,7 @@
 {
   "_instructions": "Story metadata for Mitsui Hisashi. Each CG can define localized prompt and first_line text. next_condition controls how the app advances: manual means the story button moves to the next CG; game means the button opens the basketball minigame and the listed score conditions choose the next CG.",
   "id": "mitsui-hisashi",
+  "layout": "square-cg",
   "avatar": "/Stories/Mitsui_Hisashi/Avatar.png",
   "english": {
     "name": "Mitsui Hisashi",

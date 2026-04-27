@@ -40,16 +40,29 @@
             <p id="menuEyebrow" class="eyebrow" data-i18n="charactersEyebrow">Characters</p>
             <h1 data-i18n="menuTitle">Menu</h1>
           </div>
-          <button id="openMenuSettingsButton" class="button menu-settings-button" type="button" data-i18n="settingsButton">Settings</button>
+          <button id="openMenuSettingsButton" class="button menu-settings-button icon-button" type="button" aria-label="Settings" data-i18n-aria-label="settingsButton">
+            <img class="button-icon" src="/Icons/Settings.png" alt="" />
+          </button>
         </header>
 
         <nav id="menuPageToggle" class="menu-page-toggle" aria-label="Menu pages">
-          <button class="menu-page-option" type="button" data-menu-page-value="characters" data-i18n="charactersPageButton">Characters</button>
-          <button class="menu-page-option" type="button" data-menu-page-value="stories" data-i18n="storiesPageButton">Stories</button>
+          <button class="menu-page-option" type="button" data-menu-page-value="characters" aria-label="Characters" data-i18n-aria-label="charactersPageButton">
+            <img class="button-icon" src="/Icons/Characters.png" alt="" />
+            <span class="visually-hidden" data-i18n="charactersPageButton">Characters</span>
+          </button>
+          <button class="menu-page-option" type="button" data-menu-page-value="stories" aria-label="Stories" data-i18n-aria-label="storiesPageButton">
+            <img class="button-icon" src="/Icons/Stories.png" alt="" />
+            <span class="visually-hidden" data-i18n="storiesPageButton">Stories</span>
+          </button>
+          <button class="menu-page-option" type="button" data-menu-page-value="history" aria-label="History" data-i18n-aria-label="historyPageButton">
+            <img class="button-icon" src="/Icons/History.png" alt="" />
+            <span class="visually-hidden" data-i18n="historyPageButton">History</span>
+          </button>
         </nav>
 
         <div id="characterGrid" class="character-grid"></div>
         <div id="storyGrid" class="character-grid story-grid" hidden></div>
+        <div id="historyList" class="history-list" hidden></div>
 
       </aside>
 
@@ -177,6 +190,56 @@
         </section>
       </div>
 
+      <div id="historySettingsModal" class="modal-overlay" hidden>
+        <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="historySettingsTitle">
+          <header class="modal-header">
+            <h2 id="historySettingsTitle" data-i18n="historySettingsTitle">History Settings</h2>
+            <button id="closeHistorySettingsButton" class="button button-ghost" type="button" data-i18n="closeButton">Close</button>
+          </header>
+
+          <div class="settings-stack">
+            <label class="field">
+              <span data-i18n="historyNameLabel">History Name</span>
+              <input id="historyTitleInput" type="text" />
+            </label>
+
+            <label class="field">
+              <span data-i18n="relationshipLabel">Relationship</span>
+              <textarea
+                id="historyRelationshipPrompt"
+                rows="5"
+                placeholder="Describe your relationship with this character."
+                data-i18n-placeholder="relationshipPlaceholder"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span data-i18n="firstLineLabel">First Line</span>
+              <textarea
+                id="historyFirstLinePrompt"
+                rows="3"
+                placeholder="Write the character's first line."
+                data-i18n-placeholder="firstLinePlaceholder"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span data-i18n="characterDescriptionLabel">Character Description</span>
+              <textarea
+                id="historyDescriptionPrompt"
+                rows="6"
+                placeholder="Describe this character's personality, voice, and details."
+                data-i18n-placeholder="characterDescriptionPlaceholder"
+              ></textarea>
+            </label>
+          </div>
+
+          <footer class="modal-footer">
+            <button id="downloadHistorySettingsButton" class="button button-primary" type="button" data-i18n="downloadHistoryButton">Download History</button>
+          </footer>
+        </section>
+      </div>
+
       <div hidden>
         <textarea id="systemPrompt"></textarea>
         <textarea id="worldPrompt"></textarea>
@@ -195,8 +258,12 @@
             </div>
           </div>
           <div class="header-actions">
-            <button id="openConversationSettingsButton" class="button button-ghost" type="button" data-i18n="settingsButton">Settings</button>
-            <button id="clearChatButton" class="button button-ghost" type="button" data-i18n="clearButton">Clear</button>
+            <button id="openConversationSettingsButton" class="button button-ghost icon-button" type="button" aria-label="Settings" data-i18n-aria-label="settingsButton">
+              <img class="button-icon" src="/Icons/Settings.png" alt="" />
+            </button>
+            <button id="clearChatButton" class="button button-ghost icon-button" type="button" aria-label="Clear" data-i18n-aria-label="clearButton">
+              <img class="button-icon" src="/Icons/Clear.png" alt="" />
+            </button>
           </div>
         </header>
 

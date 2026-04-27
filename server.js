@@ -12,6 +12,7 @@ const charactersDir = path.join(__dirname, "Characters");
 const backgroundsDir = path.join(__dirname, "Background");
 const storiesDir = path.join(__dirname, "Stories");
 const minigameDir = path.join(__dirname, "Minigame");
+const iconsDir = path.join(__dirname, "Icons");
 const accountsPath = path.join(__dirname, "Accounts", "users.json");
 
 loadLocalEnv();
@@ -23,7 +24,7 @@ const GLM_DEFAULT_MODEL = process.env.GLM_MODEL || "nousresearch/hermes-2-pro-ll
 const DEFAULT_MODEL_LIST = [
   "nousresearch/hermes-2-pro-llama-3-8b",
   "deepseek/deepseek-v3.2",
-  "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+  "deepseek/deepseek-v4-flash"
 ];
 const GLM_MODELS = parseConfiguredModels(process.env.GLM_MODELS, GLM_DEFAULT_MODEL);
 const GLM_REQUEST_TIMEOUT_MS = Number(process.env.GLM_REQUEST_TIMEOUT_MS || 55000);
@@ -495,12 +496,14 @@ async function serveStatic(requestPath, res, isHead = false) {
     absolutePath = path.join(__dirname, decodedPath);
   } else if (decodedPath.startsWith("/Minigame/")) {
     absolutePath = path.join(__dirname, decodedPath);
+  } else if (decodedPath.startsWith("/Icons/")) {
+    absolutePath = path.join(__dirname, decodedPath);
   } else {
     return sendJson(res, 404, { error: "Not found." });
   }
 
   const normalizedPath = path.normalize(absolutePath);
-  const allowedRoots = [publicDir, charactersDir, backgroundsDir, storiesDir, minigameDir];
+  const allowedRoots = [publicDir, charactersDir, backgroundsDir, storiesDir, minigameDir, iconsDir];
   if (!allowedRoots.some((root) => normalizedPath.startsWith(root))) {
     return sendJson(res, 403, { error: "Forbidden." });
   }

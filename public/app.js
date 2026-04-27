@@ -31,6 +31,13 @@ const TRANSLATIONS = {
     menuTitle: "Menu",
     charactersPageButton: "Characters",
     storiesPageButton: "Stories",
+    historyPageButton: "History",
+    historyEmpty: "No saved chats yet.",
+    historyDefaultTitle: "Chatting with {character}",
+    historyRenamePrompt: "Name this history",
+    historySettingsTitle: "History Settings",
+    historyNameLabel: "History Name",
+    downloadHistoryButton: "Download History",
     storyNextButton: "Next CG",
     storyStartGameButton: "Start Game",
     storyReturnToGameButton: "Return to Game",
@@ -119,6 +126,13 @@ const TRANSLATIONS = {
     menuTitle: "菜单",
     charactersPageButton: "角色",
     storiesPageButton: "故事",
+    historyPageButton: "历史",
+    historyEmpty: "还没有保存的聊天。",
+    historyDefaultTitle: "正在和{character}聊天",
+    historyRenamePrompt: "给这个历史命名",
+    historySettingsTitle: "历史设置",
+    historyNameLabel: "历史名称",
+    downloadHistoryButton: "下载历史",
     storyNextButton: "下一张 CG",
     storyStartGameButton: "开始游戏",
     storyReturnToGameButton: "返回游戏",
@@ -213,6 +227,7 @@ const elements = {
   menuEyebrow: document.querySelector("#menuEyebrow"),
   characterGrid: document.querySelector("#characterGrid"),
   storyGrid: document.querySelector("#storyGrid"),
+  historyList: document.querySelector("#historyList"),
   menuPageToggle: document.querySelector("#menuPageToggle"),
   openMenuSettingsButton: document.querySelector("#openMenuSettingsButton"),
   menuSettingsModal: document.querySelector("#menuSettingsModal"),
@@ -229,6 +244,14 @@ const elements = {
   relationshipPresetStrip: document.querySelector("#relationshipPresetStrip"),
   firstLinePrompt: document.querySelector("#firstLinePrompt"),
   characterDescriptionPrompt: document.querySelector("#characterDescriptionPrompt"),
+  historySettingsModal: document.querySelector("#historySettingsModal"),
+  closeHistorySettingsButton: document.querySelector("#closeHistorySettingsButton"),
+  historySettingsTitle: document.querySelector("#historySettingsTitle"),
+  historyTitleInput: document.querySelector("#historyTitleInput"),
+  historyRelationshipPrompt: document.querySelector("#historyRelationshipPrompt"),
+  historyFirstLinePrompt: document.querySelector("#historyFirstLinePrompt"),
+  historyDescriptionPrompt: document.querySelector("#historyDescriptionPrompt"),
+  downloadHistorySettingsButton: document.querySelector("#downloadHistorySettingsButton"),
   backgroundStrip: document.querySelector("#backgroundStrip"),
   backgroundQuickStrip: document.querySelector("#backgroundQuickStrip"),
   modelSelect: document.querySelector("#modelSelect"),
@@ -319,6 +342,7 @@ const state = {
   characterNotes: {},
   characterExpressions: {},
   characterConversations: {},
+  historyTitles: {},
   storyData: {},
   storyConversations: {},
   selectedStoryId: "",
@@ -329,6 +353,7 @@ const state = {
   username: "",
   menuPage: "characters",
   editingCharacterId: "",
+  editingHistoryCharacterId: "",
   view: "menu",
   toolbarHidden: false,
   storyToolbarHidden: false,
@@ -492,7 +517,9 @@ function bindEvents() {
       return;
     }
 
-    state.menuPage = button.dataset.menuPageValue === "stories" ? "stories" : "characters";
+    state.menuPage = ["stories", "history"].includes(button.dataset.menuPageValue)
+      ? button.dataset.menuPageValue
+      : "characters";
     persistState();
     renderMenuPage();
   });
@@ -520,6 +547,19 @@ function bindEvents() {
   elements.revertCharacterSettingsButton.addEventListener("click", revertCharacterSettings);
   elements.startCharacterConversationButton.addEventListener("click", startCharacterConversation);
   elements.characterSettingsModal.addEventListener("pointerdown", closeCharacterSettingsOnOutsideClick);
+  elements.closeHistorySettingsButton.addEventListener("click", closeHistorySettings);
+  elements.historySettingsModal.addEventListener("pointerdown", closeHistorySettingsOnOutsideClick);
+  elements.historyTitleInput.addEventListener("input", updateHistoryTitleFromInput);
+  elements.historyRelationshipPrompt.addEventListener("input", () => {
+    updateCharacterNotes(state.editingHistoryCharacterId, { relationship: elements.historyRelationshipPrompt.value });
+  });
+  elements.historyFirstLinePrompt.addEventListener("input", () => {
+    updateCharacterNotes(state.editingHistoryCharacterId, { firstLine: elements.historyFirstLinePrompt.value });
+  });
+  elements.historyDescriptionPrompt.addEventListener("input", () => {
+    updateCharacterNotes(state.editingHistoryCharacterId, { description: elements.historyDescriptionPrompt.value });
+  });
+  elements.downloadHistorySettingsButton.addEventListener("click", () => exportHistoryForCharacter(state.editingHistoryCharacterId));
   elements.relationshipPrompt.addEventListener("input", () => {
     updateCharacterNotes(state.editingCharacterId, { relationship: elements.relationshipPrompt.value });
   });
@@ -737,6 +777,7 @@ function clearConversation() {
   conversation.pendingAssistantText = "";
   persistState();
   renderDialogue({ scrollToEnd: false });
+  renderHistoryList();
   updateStatus(getTranslation().statusConversationCleared);
 }
 
@@ -748,10 +789,15 @@ function confirmClearConversation() {
 function exportHistoryFile() {
   syncDraftFromDialogue();
   persistState();
+  exportHistoryForCharacter(state.selectedCharacterId);
+}
 
-  const character = getSelectedCharacter();
-  const conversation = getSelectedConversation();
-  const openingLine = getOpeningLine();
+function exportHistoryForCharacter(characterId) {
+  const character = state.characters.find((entry) => entry.id === characterId) || null;
+  const conversation = getCharacterConversation(characterId);
+  const openingLine = character
+    ? getCharacterFirstLine(character, state.characterNotes[character.id] || {})
+    : getOpeningLine();
   const payload = {
     app: "glm-chat-companion",
     version: HISTORY_EXPORT_VERSION,
@@ -769,7 +815,7 @@ function exportHistoryFile() {
       timestamp: message.timestamp || null
     })),
     draft: conversation.draft,
-    transcript: buildDialogueText()
+    transcript: buildDialogueTextForCharacter(character, conversation, openingLine)
   };
 
   const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
@@ -782,6 +828,23 @@ function exportHistoryFile() {
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
   updateStatus(getTranslation().statusHistoryExported);
+}
+
+function buildDialogueTextForCharacter(character, conversation, openingLine) {
+  const characterName = character ? getCharacterName(character) : getCharacterDisplayName();
+  const userLabel = getUserLabel();
+  const turns = [`${characterName}: ${openingLine || getTranslation().openingLine}`];
+
+  for (const message of conversation.messages) {
+    const speaker = message.role === "user" ? userLabel : characterName;
+    turns.push(`${speaker}: ${message.content}`);
+  }
+
+  if (conversation.draft) {
+    turns.push(`${userLabel}: ${conversation.draft}`);
+  }
+
+  return turns.join("\n");
 }
 
 async function importHistoryFile(event) {
@@ -920,6 +983,7 @@ function render() {
   renderBackgroundStrip();
   renderCharacterCards();
   renderStoryCards();
+  renderHistoryList();
   renderStory();
   renderCharacter();
   renderDialogue({ scrollToEnd: true });
@@ -1260,14 +1324,152 @@ function renderCharacterCards() {
 
     const settingsButton = document.createElement("button");
     settingsButton.type = "button";
-    settingsButton.className = "button button-ghost character-settings-button";
-    settingsButton.textContent = getTranslation().settingsButton;
+    settingsButton.className = "button button-ghost character-settings-button icon-button";
+    settingsButton.setAttribute("aria-label", getTranslation().settingsButton);
+    settingsButton.append(createIconImage("/Icons/Dotdotdot.png", ""));
     settingsButton.addEventListener("click", () => openCharacterSettings(character.id));
 
     footer.append(name, settingsButton);
     card.append(button, footer);
     elements.characterGrid.append(card);
   }
+}
+
+function renderHistoryList() {
+  elements.historyList.innerHTML = "";
+  const entries = getHistoryEntries();
+
+  if (entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = getTranslation().historyEmpty;
+    elements.historyList.append(empty);
+    return;
+  }
+
+  for (const entry of entries) {
+    const row = document.createElement("article");
+    row.className = "history-row";
+
+    const resumeButton = document.createElement("button");
+    resumeButton.type = "button";
+    resumeButton.className = "history-resume-button";
+    resumeButton.addEventListener("click", () => resumeHistory(entry.characterId));
+
+    const avatar = document.createElement("img");
+    avatar.src = entry.character.avatar;
+    avatar.alt = "";
+
+    const text = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = getHistoryTitle(entry.characterId, entry.character);
+    const meta = document.createElement("span");
+    meta.textContent = `${getCharacterName(entry.character)} · ${entry.messageCount} messages`;
+
+    text.append(title, meta);
+    resumeButton.append(avatar, text);
+
+    const renameButton = document.createElement("button");
+    renameButton.type = "button";
+    renameButton.className = "button button-ghost icon-button history-rename-button";
+    renameButton.setAttribute("aria-label", getTranslation().historyRenamePrompt);
+    renameButton.append(createIconImage("/Icons/Pen.png", ""));
+    renameButton.addEventListener("click", () => openHistorySettings(entry.characterId));
+
+    row.append(resumeButton, renameButton);
+    elements.historyList.append(row);
+  }
+}
+
+function getHistoryEntries() {
+  return Object.entries(state.characterConversations)
+    .map(([characterId, conversation]) => {
+      const character = state.characters.find((entry) => entry.id === characterId);
+      if (!character || !isPlainObject(conversation)) {
+        return null;
+      }
+
+      const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+      const draft = typeof conversation.draft === "string" ? conversation.draft.trim() : "";
+      if (messages.length === 0 && !draft) {
+        return null;
+      }
+
+      return {
+        characterId,
+        character,
+        messageCount: messages.length
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => getHistoryTitle(a.characterId, a.character).localeCompare(getHistoryTitle(b.characterId, b.character)));
+}
+
+function getHistoryTitle(characterId, character) {
+  return state.historyTitles[characterId] ||
+    getTranslation().historyDefaultTitle.replace("{character}", getCharacterName(character));
+}
+
+function openHistorySettings(characterId) {
+  const character = state.characters.find((entry) => entry.id === characterId);
+  if (!character) {
+    return;
+  }
+
+  state.editingHistoryCharacterId = characterId;
+  const notes = state.characterNotes[characterId] || {};
+  elements.historySettingsTitle.textContent = `${getHistoryTitle(characterId, character)} ${getTranslation().characterSettingsSuffix}`;
+  elements.historyTitleInput.value = getHistoryTitle(characterId, character);
+  elements.historyRelationshipPrompt.value = notes.relationship || "";
+  elements.historyFirstLinePrompt.value = getCharacterFirstLine(character, notes);
+  elements.historyDescriptionPrompt.value = getCharacterPrompt(character, notes);
+  elements.historySettingsModal.hidden = false;
+}
+
+function closeHistorySettings() {
+  elements.historySettingsModal.hidden = true;
+}
+
+function closeHistorySettingsOnOutsideClick(event) {
+  if (event.target === elements.historySettingsModal) {
+    closeHistorySettings();
+  }
+}
+
+function updateHistoryTitleFromInput() {
+  const characterId = state.editingHistoryCharacterId;
+  if (!characterId) {
+    return;
+  }
+
+  const trimmedTitle = elements.historyTitleInput.value.trim();
+  if (trimmedTitle) {
+    state.historyTitles[characterId] = trimmedTitle;
+  } else {
+    delete state.historyTitles[characterId];
+  }
+
+  persistState();
+  renderHistoryList();
+}
+
+function resumeHistory(characterId) {
+  state.selectedCharacterId = characterId;
+  state.view = "conversation";
+  persistState();
+  renderCharacterCards();
+  renderCharacter();
+  renderDialogue({ scrollToEnd: true });
+  renderView();
+  moveCaretToDialogueEnd();
+}
+
+function createIconImage(src, alt) {
+  const image = document.createElement("img");
+  image.className = "button-icon";
+  image.src = src;
+  image.alt = alt;
+  return image;
 }
 
 function renderStoryCards() {
@@ -1303,10 +1505,14 @@ function renderStoryCards() {
 
 function renderMenuPage() {
   const isStoriesPage = state.menuPage === "stories";
-  elements.characterGrid.hidden = isStoriesPage;
+  const isHistoryPage = state.menuPage === "history";
+  elements.characterGrid.hidden = isStoriesPage || isHistoryPage;
   elements.storyGrid.hidden = !isStoriesPage;
+  elements.historyList.hidden = !isHistoryPage;
   elements.menuEyebrow.textContent = isStoriesPage
     ? getTranslation().storiesPageButton
+    : isHistoryPage
+      ? getTranslation().historyPageButton
     : getTranslation().charactersEyebrow;
 
   for (const button of elements.menuPageToggle.querySelectorAll("[data-menu-page-value]")) {
@@ -1360,10 +1566,16 @@ function renderStory() {
   }
 
   elements.storyTitle.textContent = getLocalizedStoryText(story).name || "Story";
+  elements.appShell.dataset.storyLayout = getStoryLayout(story, cg);
   elements.storyCgImage.src = cg.image;
   elements.storyCgImage.alt = `${elements.storyTitle.textContent} CG ${cg.id}`;
   renderStoryDialogue({ scrollToEnd: true });
   renderStoryNextButton();
+}
+
+function getStoryLayout(story, cg) {
+  const rawLayout = String(cg?.layout || story?.layout || "square-cg").trim().toLowerCase();
+  return rawLayout.replace(/[^a-z0-9_-]+/g, "-") || "square-cg";
 }
 
 function renderStoryNextButton() {
@@ -1669,6 +1881,10 @@ function setView(view) {
   persistState();
   renderView();
   syncMinigamePlayback();
+
+  if (view === "menu") {
+    renderHistoryList();
+  }
 
   if (view === "conversation") {
     moveCaretToDialogueEnd();
@@ -2351,6 +2567,7 @@ function createStateSnapshot() {
     characterNotes: state.characterNotes,
     characterExpressions: state.characterExpressions,
     characterConversations: state.characterConversations,
+    historyTitles: state.historyTitles,
     storyConversations: state.storyConversations,
     selectedStoryId: state.selectedStoryId,
     selectedStoryCgId: state.selectedStoryCgId,
@@ -2399,11 +2616,12 @@ function applyPersistedState(parsed) {
   state.characterNotes = isPlainObject(parsed.characterNotes) ? parsed.characterNotes : {};
   state.characterExpressions = isPlainObject(parsed.characterExpressions) ? parsed.characterExpressions : {};
   state.characterConversations = isPlainObject(parsed.characterConversations) ? parsed.characterConversations : {};
+  state.historyTitles = isPlainObject(parsed.historyTitles) ? parsed.historyTitles : {};
   state.storyConversations = isPlainObject(parsed.storyConversations) ? parsed.storyConversations : {};
   state.selectedStoryId = typeof parsed.selectedStoryId === "string" ? parsed.selectedStoryId : "";
   state.selectedStoryCgId = clampNumber(Number(parsed.selectedStoryCgId), 1, 99, 1);
   state.storyScores = isPlainObject(parsed.storyScores) ? parsed.storyScores : {};
-  state.menuPage = parsed.menuPage === "stories" ? "stories" : "characters";
+  state.menuPage = ["stories", "history"].includes(parsed.menuPage) ? parsed.menuPage : "characters";
 
   if (Array.isArray(parsed.messages) || typeof parsed.draft === "string") {
     state.characterConversations[parsed.selectedCharacterId || "__default"] = {
