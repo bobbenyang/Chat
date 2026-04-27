@@ -9,6 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const accountsPath = join(__dirname, "..", "Accounts", "users.json");
 const iterations = 210000;
+const generatedPasswordLength = 24;
+const generatedPasswordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
 const username = process.argv[2];
 if (!username) {
@@ -20,7 +22,7 @@ const shouldGeneratePassword = process.argv.includes("--generate-password");
 let password = "";
 
 if (shouldGeneratePassword) {
-  password = randomBytes(18).toString("base64url");
+  password = generatePassword(generatedPasswordLength);
 } else {
   const rl = createInterface({ input, output });
   password = await rl.question("Password: ");
@@ -60,3 +62,14 @@ accounts.users.push(nextUser);
 mkdirSync(dirname(accountsPath), { recursive: true });
 writeFileSync(accountsPath, `${JSON.stringify(accounts, null, 2)}\n`);
 console.log(`Updated ${accountsPath}`);
+
+function generatePassword(length) {
+  const bytes = randomBytes(length);
+  let result = "";
+
+  for (const byte of bytes) {
+    result += generatedPasswordAlphabet[byte % generatedPasswordAlphabet.length];
+  }
+
+  return result;
+}
