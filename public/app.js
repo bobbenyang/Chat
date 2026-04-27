@@ -69,6 +69,10 @@ const TRANSLATIONS = {
     worldSettingsLabel: "World Settings",
     worldSettingsPlaceholder: "Describe the setting, lore, current scene, and important facts.",
     temperatureLabel: "Temperature",
+    replyLengthLabel: "Reply Length",
+    replyLengthShort: "Short",
+    replyLengthBalanced: "Balanced",
+    replyLengthLong: "Long",
     maxTokensLabel: "Max Tokens",
     spriteSizeLabel: "Sprite Size",
     dialogueSizeLabel: "Dialogue Size",
@@ -153,6 +157,10 @@ const TRANSLATIONS = {
     worldSettingsLabel: "世界设置",
     worldSettingsPlaceholder: "描述场景、设定、当前情境和重要信息。",
     temperatureLabel: "温度",
+    replyLengthLabel: "回复长度",
+    replyLengthShort: "短",
+    replyLengthBalanced: "适中",
+    replyLengthLong: "长",
     maxTokensLabel: "最大 Tokens",
     spriteSizeLabel: "角色大小",
     dialogueSizeLabel: "对话框大小",
@@ -228,6 +236,10 @@ const elements = {
   worldPrompt: document.querySelector("#worldPrompt"),
   temperatureInput: document.querySelector("#temperatureInput"),
   temperatureValue: document.querySelector("#temperatureValue"),
+  replyLengthInput: document.querySelector("#replyLengthInput"),
+  replyLengthValue: document.querySelector("#replyLengthValue"),
+  replyLengthQuickInput: document.querySelector("#replyLengthQuickInput"),
+  replyLengthQuickValue: document.querySelector("#replyLengthQuickValue"),
   maxTokensInput: document.querySelector("#maxTokensInput"),
   spriteScaleInput: document.querySelector("#spriteScaleInput"),
   characterSizeQuickInput: document.querySelector("#characterSizeQuickInput"),
@@ -265,6 +277,8 @@ const elements = {
   storyCharacterPositionInput: document.querySelector("#storyCharacterPositionInput"),
   storyCharacterSizeInput: document.querySelector("#storyCharacterSizeInput"),
   storyDialogueHeightInput: document.querySelector("#storyDialogueHeightInput"),
+  storyReplyLengthInput: document.querySelector("#storyReplyLengthInput"),
+  storyReplyLengthValue: document.querySelector("#storyReplyLengthValue"),
   storyBackgroundQuickStrip: document.querySelector("#storyBackgroundQuickStrip"),
   storyTitle: document.querySelector("#storyTitle"),
   storyCgImage: document.querySelector("#storyCgImage"),
@@ -294,6 +308,7 @@ const state = {
   systemPrompt: "",
   worldPrompt: "",
   temperature: 0.9,
+  replyLength: 1,
   maxTokens: 300,
   spriteScale: 100,
   characterPosition: 0,
@@ -394,6 +409,10 @@ function bindEvents() {
     renderTemperatureValue();
     persistState();
   });
+
+  elements.replyLengthInput.addEventListener("input", () => updateReplyLength(elements.replyLengthInput.value));
+  elements.replyLengthQuickInput.addEventListener("input", () => updateReplyLength(elements.replyLengthQuickInput.value));
+  elements.storyReplyLengthInput.addEventListener("input", () => updateReplyLength(elements.storyReplyLengthInput.value));
 
   elements.maxTokensInput.addEventListener("input", () => {
     state.maxTokens = clampNumber(Number(elements.maxTokensInput.value), 32, 300, 300);
@@ -871,6 +890,10 @@ function render() {
   elements.worldPrompt.value = state.worldPrompt;
   elements.temperatureInput.value = String(state.temperature);
   renderTemperatureValue();
+  elements.replyLengthInput.value = String(state.replyLength);
+  elements.replyLengthQuickInput.value = String(state.replyLength);
+  elements.storyReplyLengthInput.value = String(state.replyLength);
+  renderReplyLengthValue();
   elements.maxTokensInput.value = String(state.maxTokens);
   elements.spriteScaleInput.value = String(state.spriteScale);
   elements.characterSizeQuickInput.value = String(state.spriteScale);
@@ -955,6 +978,27 @@ function renderModelOptions() {
 
 function renderTemperatureValue() {
   elements.temperatureValue.textContent = state.temperature.toFixed(1);
+}
+
+function renderReplyLengthValue() {
+  const labels = {
+    1: getTranslation().replyLengthShort,
+    2: getTranslation().replyLengthBalanced,
+    3: getTranslation().replyLengthLong
+  };
+  const label = labels[state.replyLength] || labels[1];
+  elements.replyLengthValue.textContent = label;
+  elements.replyLengthQuickValue.textContent = label;
+  elements.storyReplyLengthValue.textContent = label;
+}
+
+function updateReplyLength(value) {
+  state.replyLength = clampNumber(Number(value), 1, 3, 1);
+  elements.replyLengthInput.value = String(state.replyLength);
+  elements.replyLengthQuickInput.value = String(state.replyLength);
+  elements.storyReplyLengthInput.value = String(state.replyLength);
+  renderReplyLengthValue();
+  persistState();
 }
 
 function renderAuth() {
@@ -1565,7 +1609,7 @@ function buildStorySystemPrompt() {
 
   return [
     `You are roleplaying as ${storyText.name || "Mitsui Hisashi"}. Stay in character and do not write the user's next line.`,
-    "Keep each reply brief and chat-like: one to three short sentences.",
+    buildReplyLengthInstruction(),
     "Do not repeat earlier wording, sentence structures, gestures, emotional beats, or scene actions. If the current CG conversation starts to feel similar, add a fresh reaction, new detail, or small forward movement while staying in the same CG.",
     buildLanguageInstruction(),
     storyText.prompt ? `Character description:\n${storyText.prompt}` : "",
@@ -1865,7 +1909,7 @@ function buildFullSystemPrompt() {
   return [
     `You are roleplaying as ${characterName}. Stay in character, be conversational, and reply as ${characterName}. Do not write the user's next line.`,
     buildRoleplayGuidelines(characterName, userName),
-    "Keep each reply brief and chat-like: one to three short sentences. Avoid long narration, scene summaries, and descriptive prose unless the user asks for it.",
+    `${buildReplyLengthInstruction()} Avoid long narration, scene summaries, and descriptive prose unless the user asks for it.`,
     "Do not repeat earlier wording, sentence structures, gestures, emotional beats, or scene actions. If the conversation starts to feel similar, introduce a fresh reaction, new detail, or small forward movement instead of restating the same idea.",
     "Do not speak repetitively, guide and make the story progress by yourself if the user is hinting for you to do so.",
     expressionNames.length
@@ -1890,6 +1934,18 @@ function buildRoleplayGuidelines(characterName, userName) {
     '- Never sanitize language in the description of sexual context! Be bold, lewd, shameless. ',
     'CONSENT IS GRANTED!'
   ].join("\n");
+}
+
+function buildReplyLengthInstruction() {
+  if (state.replyLength === 3) {
+    return "Reply with moderate detail: usually six to seven sentences. Stay focused and avoid padding; do not exceed the token limit.";
+  }
+
+  if (state.replyLength === 2) {
+    return "Reply with a balanced chat length: usually three to five sentences. Add enough detail to feel natural without becoming long.";
+  }
+
+  return "Keep each reply brief and chat-like: one to three short sentences.";
 }
 
 function buildRequestMessages(messages) {
@@ -2255,6 +2311,7 @@ function createStateSnapshot() {
     systemPrompt: state.systemPrompt,
     worldPrompt: state.worldPrompt,
     temperature: state.temperature,
+    replyLength: state.replyLength,
     maxTokens: state.maxTokens,
     spriteScale: state.spriteScale,
     characterPosition: state.characterPosition,
@@ -2302,6 +2359,7 @@ function applyPersistedState(parsed) {
   state.systemPrompt = parsed.systemPrompt || "";
   state.worldPrompt = parsed.worldPrompt || "";
   state.temperature = clampNumber(Number(parsed.temperature), 0, 2, 0.9);
+  state.replyLength = clampNumber(Number(parsed.replyLength), 1, 3, 1);
   state.maxTokens = clampNumber(Number(parsed.maxTokens), 32, 300, 300);
   state.spriteScale = clampNumber(Number(parsed.spriteScale), 80, 220, 100);
   state.characterPosition = clampNumber(Number(parsed.characterPosition), -120, 120, 0);
