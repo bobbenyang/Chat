@@ -39,6 +39,7 @@ const TRANSLATIONS = {
     historyNameLabel: "History Name",
     downloadHistoryButton: "Download History",
     storyNextButton: "Next CG",
+    sendButton: "Send",
     storyStartGameButton: "Start Game",
     storyReturnToGameButton: "Return to Game",
     storyEndingButton: "Ending Reached",
@@ -134,6 +135,7 @@ const TRANSLATIONS = {
     historyNameLabel: "历史名称",
     downloadHistoryButton: "下载历史",
     storyNextButton: "下一张 CG",
+    sendButton: "发送",
     storyStartGameButton: "开始游戏",
     storyReturnToGameButton: "返回游戏",
     storyEndingButton: "已到达结局",
@@ -296,15 +298,25 @@ const elements = {
   clearStoryButton: document.querySelector("#clearStoryButton"),
   storySettingsModal: document.querySelector("#storySettingsModal"),
   closeStorySettingsButton: document.querySelector("#closeStorySettingsButton"),
+  storyCharacterSelectField: document.querySelector("#storyCharacterSelectField"),
+  storyCharacterSelect: document.querySelector("#storyCharacterSelect"),
   storyTextSizeInput: document.querySelector("#storyTextSizeInput"),
   storyCharacterPositionInput: document.querySelector("#storyCharacterPositionInput"),
   storyCharacterSizeInput: document.querySelector("#storyCharacterSizeInput"),
   storyDialogueHeightInput: document.querySelector("#storyDialogueHeightInput"),
   storyReplyLengthInput: document.querySelector("#storyReplyLengthInput"),
   storyReplyLengthValue: document.querySelector("#storyReplyLengthValue"),
+  storyBackgroundField: document.querySelector("#storyBackgroundField"),
   storyBackgroundQuickStrip: document.querySelector("#storyBackgroundQuickStrip"),
   storyTitle: document.querySelector("#storyTitle"),
   storyCgImage: document.querySelector("#storyCgImage"),
+  storyBubblePanel: document.querySelector("#storyBubblePanel"),
+  storyCharacterPicker: document.querySelector("#storyCharacterPicker"),
+  storyBubbleLog: document.querySelector("#storyBubbleLog"),
+  storyBubbleForm: document.querySelector("#storyBubbleForm"),
+  storyBubbleInput: document.querySelector("#storyBubbleInput"),
+  storyCgToggleButton: document.querySelector("#storyCgToggleButton"),
+  storyCgPicker: document.querySelector("#storyCgPicker"),
   storyChatForm: document.querySelector("#storyChatForm"),
   storyDialogueBox: document.querySelector("#storyDialogueBox"),
   storyNextButton: document.querySelector("#storyNextButton"),
@@ -317,6 +329,12 @@ const STORIES = [
     name: "Mitsui Hisashi",
     avatar: "/Stories/Mitsui_Hisashi/Avatar.png",
     metadata: "/Stories/Mitsui_Hisashi/story.json"
+  },
+  {
+    id: "customize",
+    name: "Customize",
+    avatar: "/Stories/Customize/Avatar.png",
+    metadata: "/Stories/Customize/story.json"
   }
 ];
 
@@ -348,6 +366,8 @@ const state = {
   selectedStoryId: "",
   selectedStoryCgId: 1,
   storyScores: {},
+  storyCgPickerOpen: false,
+  customizeCharacterId: "",
   authEnabled: false,
   authenticated: false,
   username: "",
@@ -510,7 +530,12 @@ function bindEvents() {
     }
   });
   elements.storyChatForm.addEventListener("submit", sendStoryMessage);
+  elements.storyBubbleForm.addEventListener("submit", sendStoryBubbleMessage);
+  elements.storyBubbleInput.addEventListener("input", syncDraftFromStoryBubbleInput);
+  elements.storyCgToggleButton.addEventListener("click", toggleStoryCgPicker);
   elements.storyNextButton.addEventListener("click", advanceStoryFromButton);
+  elements.storyCgPicker.addEventListener("click", handleStoryCgPickerClick);
+  elements.storyCharacterPicker.addEventListener("click", handleStoryCharacterPickerClick);
   elements.menuPageToggle.addEventListener("click", (event) => {
     const button = event.target.closest("[data-menu-page-value]");
     if (!button) {
@@ -603,6 +628,7 @@ function bindEvents() {
   elements.openStorySettingsButton.addEventListener("click", openStorySettings);
   elements.clearStoryButton.addEventListener("click", clearStory);
   elements.closeStorySettingsButton.addEventListener("click", closeStorySettings);
+  elements.storyCharacterSelect.addEventListener("change", selectCustomizeCharacterFromSettings);
   elements.storySettingsModal.addEventListener("pointerdown", closeStorySettingsOnOutsideClick);
   elements.backFromMinigameButton.addEventListener("click", () => setView("story"));
   window.addEventListener("message", handleMinigameMessage);
@@ -1159,6 +1185,7 @@ function closeConversationSettingsOnOutsideClick(event) {
 }
 
 function openStorySettings() {
+  renderStorySettings();
   elements.storySettingsModal.hidden = false;
 }
 
@@ -1170,6 +1197,36 @@ function closeStorySettingsOnOutsideClick(event) {
   if (event.target === elements.storySettingsModal) {
     closeStorySettings();
   }
+}
+
+function renderStorySettings() {
+  const isChat = isSelectedStoryChatLayout();
+  elements.storyCharacterSelectField.hidden = !isChat;
+  elements.storyBackgroundField.hidden = isChat;
+
+  if (!isChat) {
+    return;
+  }
+
+  elements.storyCharacterSelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select character";
+  placeholder.disabled = true;
+  placeholder.selected = !getSelectedCustomizeCharacter();
+  elements.storyCharacterSelect.append(placeholder);
+
+  for (const character of state.characters) {
+    const option = document.createElement("option");
+    option.value = character.id;
+    option.textContent = getCharacterName(character);
+    option.selected = character.id === state.customizeCharacterId;
+    elements.storyCharacterSelect.append(option);
+  }
+}
+
+function selectCustomizeCharacterFromSettings() {
+  setCustomizeCharacter(elements.storyCharacterSelect.value);
 }
 
 function openClearChatConfirm() {
@@ -1354,7 +1411,7 @@ function renderHistoryList() {
     const resumeButton = document.createElement("button");
     resumeButton.type = "button";
     resumeButton.className = "history-resume-button";
-    resumeButton.addEventListener("click", () => resumeHistory(entry.characterId));
+    resumeButton.addEventListener("click", () => resumeHistoryEntry(entry));
 
     const avatar = document.createElement("img");
     avatar.src = entry.character.avatar;
@@ -1362,9 +1419,9 @@ function renderHistoryList() {
 
     const text = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = getHistoryTitle(entry.characterId, entry.character);
+    title.textContent = entry.title;
     const meta = document.createElement("span");
-    meta.textContent = `${getCharacterName(entry.character)} · ${entry.messageCount} messages`;
+    meta.textContent = entry.meta;
 
     text.append(title, meta);
     resumeButton.append(avatar, text);
@@ -1374,6 +1431,7 @@ function renderHistoryList() {
     renameButton.className = "button button-ghost icon-button history-rename-button";
     renameButton.setAttribute("aria-label", getTranslation().historyRenamePrompt);
     renameButton.append(createIconImage("/Icons/Pen.png", ""));
+    renameButton.hidden = entry.type !== "character";
     renameButton.addEventListener("click", () => openHistorySettings(entry.characterId));
 
     row.append(resumeButton, renameButton);
@@ -1382,7 +1440,7 @@ function renderHistoryList() {
 }
 
 function getHistoryEntries() {
-  return Object.entries(state.characterConversations)
+  const characterEntries = Object.entries(state.characterConversations)
     .map(([characterId, conversation]) => {
       const character = state.characters.find((entry) => entry.id === characterId);
       if (!character || !isPlainObject(conversation)) {
@@ -1396,13 +1454,48 @@ function getHistoryEntries() {
       }
 
       return {
+        type: "character",
         characterId,
         character,
-        messageCount: messages.length
+        messageCount: messages.length,
+        title: getHistoryTitle(characterId, character),
+        meta: `${getCharacterName(character)} · ${messages.length} messages`
       };
     })
-    .filter(Boolean)
-    .sort((a, b) => getHistoryTitle(a.characterId, a.character).localeCompare(getHistoryTitle(b.characterId, b.character)));
+    .filter(Boolean);
+
+  const customizeEntries = Object.entries(state.storyConversations)
+    .map(([key, conversation]) => {
+      const match = key.match(/^customize:([^:]+):chat$/);
+      if (!match || !isPlainObject(conversation)) {
+        return null;
+      }
+
+      const characterId = match[1];
+      const character = state.characters.find((entry) => entry.id === characterId);
+      if (!character) {
+        return null;
+      }
+
+      const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+      const draft = typeof conversation.draft === "string" ? conversation.draft.trim() : "";
+      if (messages.length === 0 && !draft) {
+        return null;
+      }
+
+      return {
+        type: "customize",
+        characterId,
+        character,
+        messageCount: messages.length,
+        title: `Customize · ${getCharacterName(character)}`,
+        meta: `${getCharacterName(character)} · ${messages.length} messages`
+      };
+    })
+    .filter(Boolean);
+
+  return [...characterEntries, ...customizeEntries]
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 function getHistoryTitle(characterId, character) {
@@ -1462,6 +1555,29 @@ function resumeHistory(characterId) {
   renderDialogue({ scrollToEnd: true });
   renderView();
   moveCaretToDialogueEnd();
+}
+
+function resumeHistoryEntry(entry) {
+  if (entry.type === "customize") {
+    state.selectedStoryId = "customize";
+    state.customizeCharacterId = entry.characterId;
+    state.view = "story";
+
+    loadStory(STORIES.find((story) => story.id === "customize"))
+      .then(() => {
+        persistState();
+        renderStory();
+        renderView();
+        elements.storyBubbleInput.focus();
+      })
+      .catch((error) => {
+        console.error(error);
+        updateStatus(error.message || "Could not load story.");
+      });
+    return;
+  }
+
+  resumeHistory(entry.characterId);
 }
 
 function createIconImage(src, alt) {
@@ -1569,13 +1685,38 @@ function renderStory() {
   elements.appShell.dataset.storyLayout = getStoryLayout(story, cg);
   elements.storyCgImage.src = cg.image;
   elements.storyCgImage.alt = `${elements.storyTitle.textContent} CG ${cg.id}`;
+  renderStoryMode();
+  renderStoryCharacterPicker();
   renderStoryDialogue({ scrollToEnd: true });
+  renderStoryBubbles({ scrollToEnd: true });
+  renderStoryCgPicker();
   renderStoryNextButton();
+}
+
+function renderStoryMode() {
+  const isChat = isSelectedStoryChatLayout();
+  const hasCustomizeCharacter = !isChat || Boolean(getSelectedCustomizeCharacter());
+  elements.storyBubblePanel.hidden = !isChat;
+  elements.storyChatForm.hidden = isChat;
+  elements.storyNextButton.closest(".story-actions").hidden = isChat;
+  elements.storyCharacterPicker.hidden = hasCustomizeCharacter;
+  elements.storyBubbleLog.hidden = !hasCustomizeCharacter;
+  elements.storyBubbleForm.hidden = !hasCustomizeCharacter;
+  elements.storyCgPicker.hidden = !hasCustomizeCharacter || !state.storyCgPickerOpen;
+  elements.storyBackgroundField.hidden = isChat;
+  elements.storyCharacterSelectField.hidden = !isChat;
+  if (isChat && !elements.storySettingsModal.hidden) {
+    renderStorySettings();
+  }
 }
 
 function getStoryLayout(story, cg) {
   const rawLayout = String(cg?.layout || story?.layout || "square-cg").trim().toLowerCase();
   return rawLayout.replace(/[^a-z0-9_-]+/g, "-") || "square-cg";
+}
+
+function isSelectedStoryChatLayout() {
+  return getStoryLayout(getSelectedStory(), getSelectedStoryCg()) === "chat-cg";
 }
 
 function renderStoryNextButton() {
@@ -1633,7 +1774,11 @@ function clearStory() {
   resetMinigame();
   persistState();
   renderStory();
-  moveCaretToStoryDialogueEnd();
+  if (isSelectedStoryChatLayout()) {
+    elements.storyBubbleInput.focus();
+  } else {
+    moveCaretToStoryDialogueEnd();
+  }
 }
 
 function handleMinigameMessage(event) {
@@ -1661,7 +1806,11 @@ function handleMinigameMessage(event) {
     persistState();
     renderStory();
     setView("story");
-    moveCaretToStoryDialogueEnd();
+    if (isSelectedStoryChatLayout()) {
+      elements.storyBubbleInput.focus();
+    } else {
+      moveCaretToStoryDialogueEnd();
+    }
     return;
   }
 
@@ -1694,7 +1843,11 @@ function setStoryCg(cgId) {
   state.selectedStoryCgId = Number(cgId);
   persistState();
   renderStory();
-  moveCaretToStoryDialogueEnd();
+  if (isSelectedStoryChatLayout()) {
+    elements.storyBubbleInput.focus();
+  } else {
+    moveCaretToStoryDialogueEnd();
+  }
 }
 
 function resetMinigame() {
@@ -1709,6 +1862,9 @@ function focusMinigame() {
 
 async function sendStoryMessage(event) {
   event.preventDefault();
+  if (isSelectedStoryChatLayout()) {
+    return;
+  }
   syncDraftFromStoryDialogue();
 
   const conversation = getSelectedStoryConversation();
@@ -1767,7 +1923,248 @@ async function sendStoryMessage(event) {
   }
 }
 
+async function sendStoryBubbleMessage(event) {
+  event.preventDefault();
+  if (!getSelectedCustomizeCharacter()) {
+    return;
+  }
+
+  const conversation = getSelectedStoryConversation();
+  const content = elements.storyBubbleInput.value.trim();
+  if (!content || state.busy) {
+    return;
+  }
+
+  if (state.models.length === 0) {
+    updateStatus(getTranslation().statusNeedConnect);
+    return;
+  }
+
+  if (!state.model) {
+    updateStatus(getTranslation().statusNeedModel);
+    return;
+  }
+
+  conversation.messages.push({ role: "user", content, timestamp: new Date().toISOString() });
+  conversation.draft = "";
+  conversation.pendingAssistantText = "";
+  elements.storyBubbleInput.value = "";
+  setBusy(true);
+  persistState();
+  renderStoryBubbles({ scrollToEnd: true });
+
+  try {
+    let streamedReply = "";
+    const reply = await postStreamingChat("/api/chat", {
+      model: state.model,
+      systemPrompt: buildStorySystemPrompt(),
+      messages: buildStoryRequestMessages(conversation.messages),
+      temperature: state.temperature,
+      maxTokens: state.maxTokens
+    }, (text) => {
+      streamedReply += text;
+      conversation.pendingAssistantText = streamedReply;
+      renderStoryBubbles({ scrollToEnd: true });
+    });
+
+    conversation.messages.push({
+      role: "assistant",
+      content: reply.trim(),
+      timestamp: new Date().toISOString()
+    });
+    conversation.pendingAssistantText = "";
+    setBusy(false);
+    persistState();
+    renderStoryBubbles({ scrollToEnd: true });
+  } catch (error) {
+    conversation.pendingAssistantText = "";
+    setBusy(false);
+    updateStatus(error.message || getTranslation().statusMessageFailed);
+    persistState();
+    renderStoryBubbles({ scrollToEnd: true });
+  }
+}
+
+function syncDraftFromStoryBubbleInput() {
+  if (state.busy || !isSelectedStoryChatLayout() || !getSelectedCustomizeCharacter()) {
+    return;
+  }
+
+  getSelectedStoryConversation().draft = elements.storyBubbleInput.value;
+  persistState();
+}
+
+function renderStoryBubbles({ scrollToEnd = false } = {}) {
+  if (!isSelectedStoryChatLayout()) {
+    return;
+  }
+
+  const character = getSelectedCustomizeCharacter();
+  if (!character) {
+    elements.storyBubbleLog.innerHTML = "";
+    return;
+  }
+
+  const story = getSelectedStory();
+  const cg = getSelectedStoryCg();
+  const cgText = getLocalizedStoryText(cg);
+  const characterName = getCharacterName(character);
+  const conversation = getSelectedStoryConversation();
+  const messages = [
+    {
+      role: "assistant",
+      content: cgText.first_line || getCharacterFirstLine(character, state.characterNotes[character.id] || {}) || getTranslation().openingLine
+    },
+    ...conversation.messages
+  ];
+
+  if (state.busy && state.view === "story" && conversation.pendingAssistantText) {
+    messages.push({ role: "assistant", content: conversation.pendingAssistantText });
+  }
+
+  elements.storyBubbleLog.innerHTML = "";
+  for (const message of messages) {
+    const row = document.createElement("div");
+    row.className = `story-bubble-row story-bubble-row-${message.role === "user" ? "user" : "assistant"}`;
+
+    if (message.role !== "user") {
+      const avatar = document.createElement("img");
+      avatar.className = "story-bubble-avatar";
+      avatar.src = character.avatar;
+      avatar.alt = "";
+      row.append(avatar);
+    }
+
+    const bubble = document.createElement("div");
+    bubble.className = "story-bubble";
+    bubble.textContent = message.content;
+    bubble.setAttribute("aria-label", message.role === "user" ? getUserLabel() : characterName);
+
+    row.append(bubble);
+    elements.storyBubbleLog.append(row);
+  }
+
+  elements.storyBubbleInput.value = conversation.draft || "";
+  elements.storyBubbleInput.readOnly = state.busy;
+
+  if (scrollToEnd) {
+    elements.storyBubbleLog.scrollTop = elements.storyBubbleLog.scrollHeight;
+  }
+}
+
+function renderStoryCgPicker() {
+  if (!isSelectedStoryChatLayout()) {
+    elements.storyCgPicker.innerHTML = "";
+    elements.storyCgPicker.hidden = true;
+    return;
+  }
+
+  if (!getSelectedCustomizeCharacter()) {
+    elements.storyCgPicker.innerHTML = "";
+    elements.storyCgPicker.hidden = true;
+    return;
+  }
+
+  const story = getSelectedStory();
+  elements.storyCgPicker.hidden = !state.storyCgPickerOpen;
+  elements.storyCgToggleButton.setAttribute("aria-expanded", state.storyCgPickerOpen ? "true" : "false");
+  elements.storyCgPicker.innerHTML = "";
+  for (const cg of story?.cgs || []) {
+    const cgText = getLocalizedStoryText(cg);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "story-cg-picker-button";
+    button.dataset.cgId = String(cg.id);
+    button.setAttribute("aria-pressed", Number(cg.id) === Number(state.selectedStoryCgId) ? "true" : "false");
+    button.setAttribute("aria-label", cgText.name || `CG ${cg.id}`);
+    button.classList.toggle("is-selected", Number(cg.id) === Number(state.selectedStoryCgId));
+
+    const image = document.createElement("img");
+    image.src = cg.image;
+    image.alt = "";
+    button.append(image);
+    elements.storyCgPicker.append(button);
+  }
+}
+
+function renderStoryCharacterPicker() {
+  if (!isSelectedStoryChatLayout()) {
+    elements.storyCharacterPicker.innerHTML = "";
+    return;
+  }
+
+  elements.storyCharacterPicker.innerHTML = "";
+  const selectedCharacter = getSelectedCustomizeCharacter();
+  if (selectedCharacter) {
+    return;
+  }
+
+  for (const character of state.characters) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "story-character-choice";
+    button.dataset.characterId = character.id;
+
+    const image = document.createElement("img");
+    image.src = character.avatar;
+    image.alt = "";
+
+    const name = document.createElement("span");
+    name.textContent = getCharacterName(character);
+
+    button.append(image, name);
+    elements.storyCharacterPicker.append(button);
+  }
+}
+
+function handleStoryCharacterPickerClick(event) {
+  const button = event.target.closest("[data-character-id]");
+  if (!button) {
+    return;
+  }
+
+  setCustomizeCharacter(button.dataset.characterId);
+}
+
+function setCustomizeCharacter(characterId) {
+  if (!state.characters.some((character) => character.id === characterId)) {
+    return;
+  }
+
+  state.customizeCharacterId = characterId;
+  persistState();
+  renderStory();
+  renderHistoryList();
+  elements.storyBubbleInput.focus();
+}
+
+function toggleStoryCgPicker() {
+  if (!isSelectedStoryChatLayout()) {
+    return;
+  }
+
+  state.storyCgPickerOpen = !state.storyCgPickerOpen;
+  persistState();
+  renderStoryCgPicker();
+}
+
+function handleStoryCgPickerClick(event) {
+  const button = event.target.closest("[data-cg-id]");
+  if (!button) {
+    return;
+  }
+
+  setStoryCg(button.dataset.cgId);
+  state.storyCgPickerOpen = false;
+  persistState();
+  renderStoryCgPicker();
+}
+
 function renderStoryDialogue({ scrollToEnd = false } = {}) {
+  if (isSelectedStoryChatLayout()) {
+    return;
+  }
+
   elements.storyDialogueBox.value = buildStoryDialogueText();
   if (scrollToEnd) {
     moveCaretToStoryDialogueEnd();
@@ -1839,6 +2236,25 @@ function buildStorySystemPrompt() {
   const cg = getSelectedStoryCg();
   const storyText = getLocalizedStoryText(story);
   const cgText = getLocalizedStoryText(cg);
+
+  if (isSelectedStoryChatLayout()) {
+    const character = getSelectedCustomizeCharacter();
+    const notes = character ? state.characterNotes[character.id] || {} : {};
+    const characterName = character ? getCharacterName(character) : storyText.name || "Customize";
+    const characterPrompt = character ? getCharacterPrompt(character, notes) : "";
+
+    return [
+      buildRoleplaySection(characterName, { sceneLabel: "selected CG chat" }),
+      buildExpressionSection([]),
+      buildLanguageInstruction(),
+      characterPrompt ? `Character prompt:\n${characterPrompt}` : "",
+      notes.relationship ? `Relationship with the user:\n${notes.relationship.trim()}` : "",
+      cgText.prompt ? `Current CG scene:\n${cgText.prompt}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
   const characterName = storyText.name || "Mitsui Hisashi";
 
   return [
@@ -2247,7 +2663,9 @@ function getSelectedStoryCg() {
 
 function getSelectedStoryConversation() {
   const storyId = state.selectedStoryId || "__story";
-  const cgId = state.selectedStoryCgId || 1;
+  const cgId = isSelectedStoryChatLayout()
+    ? `${state.customizeCharacterId || "__pending"}:chat`
+    : state.selectedStoryCgId || 1;
   const key = `${storyId}:${cgId}`;
   if (!isPlainObject(state.storyConversations[key])) {
     state.storyConversations[key] = createEmptyConversation();
@@ -2274,6 +2692,14 @@ function getSelectedStoryScores() {
   }
 
   return state.storyScores[storyId];
+}
+
+function getSelectedCustomizeCharacter() {
+  if (!isSelectedStoryChatLayout()) {
+    return null;
+  }
+
+  return state.characters.find((character) => character.id === state.customizeCharacterId) || null;
 }
 
 function getLocalizedStoryText(entry) {
@@ -2545,6 +2971,7 @@ function setBusy(busy) {
   state.busy = busy;
   elements.dialogueBox.readOnly = busy;
   elements.storyDialogueBox.readOnly = busy;
+  elements.storyBubbleInput.readOnly = busy;
 }
 
 function createStateSnapshot() {
@@ -2568,11 +2995,13 @@ function createStateSnapshot() {
     characterExpressions: state.characterExpressions,
     characterConversations: state.characterConversations,
     historyTitles: state.historyTitles,
-    storyConversations: state.storyConversations,
-    selectedStoryId: state.selectedStoryId,
-    selectedStoryCgId: state.selectedStoryCgId,
-    storyScores: state.storyScores,
-    menuPage: state.menuPage,
+  storyConversations: state.storyConversations,
+  selectedStoryId: state.selectedStoryId,
+  selectedStoryCgId: state.selectedStoryCgId,
+  storyScores: state.storyScores,
+  storyCgPickerOpen: state.storyCgPickerOpen,
+  customizeCharacterId: state.customizeCharacterId,
+  menuPage: state.menuPage,
     view: state.view,
     toolbarHidden: state.toolbarHidden,
     storyToolbarHidden: state.storyToolbarHidden
@@ -2621,6 +3050,8 @@ function applyPersistedState(parsed) {
   state.selectedStoryId = typeof parsed.selectedStoryId === "string" ? parsed.selectedStoryId : "";
   state.selectedStoryCgId = clampNumber(Number(parsed.selectedStoryCgId), 1, 99, 1);
   state.storyScores = isPlainObject(parsed.storyScores) ? parsed.storyScores : {};
+  state.storyCgPickerOpen = Boolean(parsed.storyCgPickerOpen);
+  state.customizeCharacterId = typeof parsed.customizeCharacterId === "string" ? parsed.customizeCharacterId : "";
   state.menuPage = ["stories", "history"].includes(parsed.menuPage) ? parsed.menuPage : "characters";
 
   if (Array.isArray(parsed.messages) || typeof parsed.draft === "string") {

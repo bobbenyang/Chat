@@ -363,8 +363,12 @@
             </div>
           </div>
           <div class="header-actions">
-            <button id="openStorySettingsButton" class="button button-ghost" type="button" data-i18n="settingsButton">Settings</button>
-            <button id="clearStoryButton" class="button button-ghost" type="button" data-i18n="clearButton">Clear</button>
+            <button id="openStorySettingsButton" class="button button-ghost icon-button" type="button" aria-label="Settings" data-i18n-aria-label="settingsButton">
+              <img class="button-icon" src="/Icons/Settings.png" alt="" />
+            </button>
+            <button id="clearStoryButton" class="button button-ghost icon-button" type="button" aria-label="Clear" data-i18n-aria-label="clearButton">
+              <img class="button-icon" src="/Icons/Clear.png" alt="" />
+            </button>
           </div>
         </header>
 
@@ -376,6 +380,11 @@
             </header>
 
             <div class="settings-stack">
+              <label id="storyCharacterSelectField" class="field" hidden>
+                <span data-i18n="charactersPageButton">Characters</span>
+                <select id="storyCharacterSelect"></select>
+              </label>
+
               <label class="field">
                 <span data-i18n="textSizeLabel">Text Size</span>
                 <input id="storyTextSizeInput" type="range" min="85" max="200" step="5" value="103" />
@@ -404,7 +413,7 @@
                 <input id="storyReplyLengthInput" type="range" min="1" max="3" step="1" value="1" />
               </label>
 
-              <label class="field">
+              <label id="storyBackgroundField" class="field">
                 <span data-i18n="backgroundLabel">Background</span>
                 <div id="storyBackgroundQuickStrip" class="background-strip"></div>
               </label>
@@ -412,14 +421,26 @@
           </section>
         </div>
 
+        <div class="story-actions">
+          <button id="storyNextButton" class="button button-primary" type="button" data-i18n="storyNextButton">Next CG</button>
+        </div>
+
         <div class="story-stage">
           <img id="storyCgImage" class="story-cg-image" src="" alt="" />
         </div>
 
+        <section id="storyBubblePanel" class="story-bubble-panel" aria-label="Story chat" hidden>
+          <div id="storyCharacterPicker" class="story-character-picker"></div>
+          <div id="storyBubbleLog" class="story-bubble-log"></div>
+          <form id="storyBubbleForm" class="story-bubble-form">
+            <button id="storyCgToggleButton" class="button button-ghost" type="button">CG</button>
+            <input id="storyBubbleInput" type="text" autocomplete="off" enterkeyhint="send" aria-label="Story message" />
+            <button id="storyBubbleSendButton" class="button button-primary" type="submit" data-i18n="sendButton">Send</button>
+          </form>
+          <div id="storyCgPicker" class="story-cg-picker" aria-label="CG picker" hidden></div>
+        </section>
+
         <form id="storyChatForm" class="dialogue-form story-dialogue-form">
-          <div class="story-actions">
-            <button id="storyNextButton" class="button button-primary" type="button" data-i18n="storyNextButton">Next CG</button>
-          </div>
           <textarea
             id="storyDialogueBox"
             class="dialogue-box"

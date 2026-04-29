@@ -1,0 +1,55 @@
+{
+  "id": "customize",
+  "layout": "chat-cg",
+  "avatar": "/Stories/Customize/Avatar.png",
+  "english": {
+    "name": "Customize"
+  },
+  "chinese": {
+    "name": "自定义"
+  },
+  "cgs": [
+    {
+      "id": 1,
+      "image": "/Stories/Customize/CG/Chest.png",
+      "english": {
+        "name": "Chest",
+        "prompt": "You show your sexy upper body.",
+        "first_line": "(I show you my naked upper body)"
+      },
+      "chinese": {
+        "name": "胸部",
+        "prompt": "你露出了自己性感的上半身。",
+        "first_line": "（我露出了上半身。）"
+      }
+    },
+    {
+      "id": 2,
+      "image": "/Stories/Customize/CG/Ass.png",
+      "english": {
+        "name": "Ass",
+        "prompt": "You open up your ass, letting the user see your anus.",
+        "first_line": "(I let you behind me, opening my ass, showing my anus.)"
+      },
+      "chinese": {
+        "name": "臀部",
+        "prompt": "你背对着我，露出了你饱满的臀部以及紧致的后穴。",
+        "first_line": "（我露出了我饱满的臀部以及紧致的后穴）"
+      }
+    },
+    {
+      "id": 3,
+      "image": "/Stories/Customize/CG/Armpit.png",
+      "english": {
+        "name": "Armpit",
+        "prompt": "You show your clean shaved armpit.",
+        "first_line": "(I show my clean shaved armpit.)"
+      },
+      "chinese": {
+        "name": "腋下",
+        "prompt": "你展示出你没有一根毛的性感腋下。",
+        "first_line": "（我露出了我的腋下）"
+      }
+    }
+  ]
+}
