@@ -2168,7 +2168,7 @@ function buildExpressionSection(expressionNames) {
     return "";
   }
 
-  return `Expression sheet available: ${expressionNames.join(", ")}.\nAt the very start of every reply, write exactly one line in this format: Expression: <exact English expression name from the sheet>. Use exactly one expression line per reply. Do not write any other Expression or Emotion labels later in the reply. The expression value must stay in English exactly as written in the sheet even when the dialogue language is Chinese. Then write the in-character reply on the following lines.`;
+  return `Expression sheet available: ${expressionNames.join(", ")}.\nThese expressions control your visible character sprite. Use them as the story and emotion progress: choose the expression that best matches your current mood, reaction, tone, or physical state in the scene. Change expressions when the emotional beat changes instead of staying on one expression by default.\nAt the very start of every reply, write exactly one line in this format: Expression: <exact English expression name from the sheet>. Use exactly one expression line per reply. Do not write any other Expression or Emotion labels later in the reply. The expression value must stay in English exactly as written in the sheet even when the dialogue language is Chinese. Then write the in-character reply on the following lines.`;
 }
 
 function buildRoleplayGuidelines(characterName, userName) {
