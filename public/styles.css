@@ -660,6 +660,40 @@ textarea {
   object-fit: cover;
 }
 
+.character-cg-strip {
+  grid-auto-columns: minmax(6.5rem, 7.5rem);
+}
+
+.character-cg-card {
+  position: relative;
+  gap: 0;
+  overflow: hidden;
+}
+
+.character-cg-card span {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 2;
+  max-width: calc(100% - 0.7rem);
+  border-radius: 8px;
+  padding: 0.25rem 0.4rem;
+  color: #fffaf1;
+  background: rgba(23, 27, 34, 0.74);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.character-cg-card.is-locked {
+  cursor: default;
+}
+
+.character-cg-card.is-locked img {
+  filter: grayscale(1) brightness(0.48);
+}
+
 input,
 select,
 textarea {
@@ -715,6 +749,28 @@ textarea:focus {
   font-size: var(--ui-font-size);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+}
+
+.character-cg-active .conversation-header {
+  position: absolute;
+  inset: 0 0 auto;
+  grid-column: 1;
+}
+
+.character-cg-active .conversation-panel {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.character-cg-active .character-stage {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: stretch;
+}
+
+.character-cg-active .dialogue-form {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: 0;
 }
 
 .conversation-header h2 {
@@ -798,6 +854,13 @@ textarea:focus {
   overflow: visible;
 }
 
+.character-stage-cg {
+  align-items: start;
+  justify-items: center;
+  padding: 0;
+  overflow: hidden;
+}
+
 .character-portrait {
   display: block;
   width: auto;
@@ -812,6 +875,23 @@ textarea:focus {
   transform: translateY(calc(var(--sprite-drop) + var(--sprite-extra-y))) scale(var(--sprite-scale-ratio));
   transform-origin: center 32%;
   pointer-events: none;
+}
+
+.character-portrait-cg {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  object-position: top center;
+  filter: none;
+  transform: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .dialogue-form {

@@ -294,6 +294,7 @@ async function listCharacters() {
     const characterPath = path.join(charactersDir, entry.name);
     const metadata = await readCharacterMetadata(characterPath, entry.name);
     const expressions = await listCharacterExpressions(characterPath, entry.name);
+    const cgs = await listCharacterCgs(characterPath, entry.name);
     if (expressions.length === 0) {
       continue;
     }
@@ -324,7 +325,8 @@ async function listCharacters() {
         ...globalRelationshipPresets
       ],
       avatar,
-      expressions
+      expressions,
+      cgs
     });
   }
 
@@ -458,6 +460,33 @@ async function listCharacterExpressions(characterPath, characterName) {
     }
     return a.name.localeCompare(b.name);
   });
+}
+
+async function listCharacterCgs(characterPath, characterName) {
+  const cgDir = path.join(characterPath, "CG");
+  let entries;
+
+  try {
+    entries = await readdir(cgDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.warn(`Could not read CG files for ${characterName}: ${error.message}`);
+    }
+    return [];
+  }
+
+  return entries
+    .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === ".png")
+    .map((entry) => {
+      const name = path.basename(entry.name, ".png");
+      const relativeDir = path.relative(charactersDir, cgDir).split(path.sep).map(encodeURIComponent).join("/");
+      return {
+        id: name.toLowerCase(),
+        name,
+        image: `/Characters/${relativeDir}/${encodeURIComponent(entry.name)}`
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function listBackgrounds() {

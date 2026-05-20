@@ -71,6 +71,9 @@ const TRANSLATIONS = {
     firstLineLabel: "First Line",
     firstLinePlaceholder: "Write the character's first line.",
     backgroundLabel: "Background",
+    cgLabel: "CG",
+    normalSpriteLabel: "Sprite",
+    lockedCgLabel: "Locked",
     modelLabel: "Model",
     characterCardLabel: "Character Card",
     characterCardPlaceholder: "Describe the character's personality, speech style, and rules.",
@@ -167,6 +170,9 @@ const TRANSLATIONS = {
     firstLineLabel: "第一句话",
     firstLinePlaceholder: "写下角色开场时说的第一句话。",
     backgroundLabel: "背景",
+    cgLabel: "CG",
+    normalSpriteLabel: "立绘",
+    lockedCgLabel: "未解锁",
     modelLabel: "模型",
     characterCardLabel: "角色卡",
     characterCardPlaceholder: "描述角色的性格、说话方式和规则。",
@@ -255,6 +261,7 @@ const elements = {
   historyDescriptionPrompt: document.querySelector("#historyDescriptionPrompt"),
   downloadHistorySettingsButton: document.querySelector("#downloadHistorySettingsButton"),
   backgroundStrip: document.querySelector("#backgroundStrip"),
+  characterCgStrip: document.querySelector("#characterCgStrip"),
   backgroundQuickStrip: document.querySelector("#backgroundQuickStrip"),
   modelSelect: document.querySelector("#modelSelect"),
   systemPrompt: document.querySelector("#systemPrompt"),
@@ -272,6 +279,7 @@ const elements = {
   dialogueHeightQuickInput: document.querySelector("#dialogueHeightQuickInput"),
   textSizeInput: document.querySelector("#textSizeInput"),
   characterPositionInput: document.querySelector("#characterPositionInput"),
+  characterStage: document.querySelector("#characterStage"),
   characterPortrait: document.querySelector("#characterPortrait"),
   characterName: document.querySelector("#characterName"),
   conversationHeader: document.querySelector("#conversationHeader"),
@@ -359,6 +367,8 @@ const state = {
   theme: "day",
   characterNotes: {},
   characterExpressions: {},
+  characterCgs: {},
+  unlockedCharacterCgs: {},
   characterConversations: {},
   historyTitles: {},
   storyData: {},
@@ -597,6 +607,7 @@ function bindEvents() {
     applyRelationshipPreset(button.dataset.presetId);
   });
   elements.backgroundStrip.addEventListener("click", handleBackgroundStripClick);
+  elements.characterCgStrip.addEventListener("click", handleCharacterCgStripClick);
   elements.backgroundQuickStrip.addEventListener("click", handleBackgroundStripClick);
   elements.storyBackgroundQuickStrip.addEventListener("click", handleBackgroundStripClick);
   elements.firstLinePrompt.addEventListener("input", () => {
@@ -766,9 +777,12 @@ async function sendMessage(event) {
     });
 
     stopWaitingAnimation({ clearText: false });
-    const parsedReply = parseExpressionReply(reply);
+    const parsedReply = parseVisualReply(reply);
     if (parsedReply.expression) {
       setCharacterExpression(state.selectedCharacterId, parsedReply.expression);
+    }
+    if (parsedReply.hasCg) {
+      setCharacterCg(state.selectedCharacterId, parsedReply.cg, { unlock: true });
     }
 
     conversation.pendingAssistantText = parsedReply.text;
@@ -1007,6 +1021,7 @@ function render() {
   renderMenuPage();
   renderModelOptions();
   renderBackgroundStrip();
+  renderCharacterCgStrip();
   renderCharacterCards();
   renderStoryCards();
   renderHistoryList();
@@ -1131,6 +1146,93 @@ function renderBackgroundCards(container) {
   }
 }
 
+function renderCharacterCgStrip() {
+  elements.characterCgStrip.innerHTML = "";
+  const character = getSelectedCharacter();
+  if (!character) {
+    elements.characterCgStrip.closest(".field").hidden = true;
+    return;
+  }
+
+  const cgs = character.cgs || [];
+  const hasUnlockedCgs = cgs.some((cg) => isCharacterCgUnlocked(character.id, cg.id));
+  elements.characterCgStrip.closest(".field").hidden = cgs.length === 0 || !hasUnlockedCgs;
+  if (cgs.length === 0 || !hasUnlockedCgs) {
+    return;
+  }
+
+  const normalButton = createCharacterCgButton({
+    id: "",
+    name: getTranslation().normalSpriteLabel,
+    image: getSelectedCharacterExpression(character)?.image || character.avatar
+  }, character);
+  elements.characterCgStrip.append(normalButton);
+
+  for (const cg of cgs) {
+    elements.characterCgStrip.append(createCharacterCgButton(cg, character));
+  }
+}
+
+function createCharacterCgButton(cg, character) {
+  const selectedCgId = state.characterCgs[character.id] || "";
+  const isSelected = (cg.id || "") === selectedCgId;
+  const isNormalSprite = !cg.id;
+  const isUnlocked = isNormalSprite || isCharacterCgUnlocked(character.id, cg.id);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "background-card character-cg-card";
+  button.dataset.characterCgId = cg.id || "";
+  button.disabled = !isUnlocked;
+  button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  button.setAttribute("aria-label", cg.name);
+  button.classList.toggle("is-selected", isSelected);
+  button.classList.toggle("is-locked", !isUnlocked);
+
+  const image = document.createElement("img");
+  image.src = cg.image;
+  image.alt = "";
+
+  button.append(image);
+
+  if (!isUnlocked) {
+    const name = document.createElement("span");
+    name.textContent = formatCgName(cg.name) || getTranslation().lockedCgLabel;
+    button.append(name);
+  }
+
+  return button;
+}
+
+function handleCharacterCgStripClick(event) {
+  const button = event.target.closest("[data-character-cg-id]");
+  if (!button) {
+    return;
+  }
+
+  event.preventDefault();
+  const characterId = state.selectedCharacterId;
+  const cgId = button.dataset.characterCgId || "";
+  if (cgId && !isCharacterCgUnlocked(characterId, cgId)) {
+    return;
+  }
+
+  const character = state.characters.find((entry) => entry.id === characterId);
+  const cg = (character?.cgs || []).find((entry) => entry.id === cgId);
+  setCharacterCg(characterId, cg?.name || "", { requireUnlocked: true });
+  persistState();
+  updateSelectedCharacterCgCards();
+}
+
+function updateSelectedCharacterCgCards() {
+  const characterId = state.selectedCharacterId;
+  const selectedCgId = state.characterCgs[characterId] || "";
+  for (const button of elements.characterCgStrip.querySelectorAll("[data-character-cg-id]")) {
+    const isSelected = (button.dataset.characterCgId || "") === selectedCgId;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  }
+}
+
 function handleBackgroundStripClick(event) {
   const button = event.target.closest("[data-background-id]");
   if (!button) {
@@ -1171,6 +1273,7 @@ function closeMenuSettingsOnOutsideClick(event) {
 }
 
 function openConversationSettings() {
+  renderCharacterCgStrip();
   elements.conversationSettingsModal.hidden = false;
 }
 
@@ -2425,13 +2528,21 @@ function renderCharacter() {
   if (!character) {
     elements.characterPortrait.removeAttribute("src");
     elements.characterPortrait.alt = "";
+    elements.appShell.classList.remove("character-cg-active");
+    elements.characterStage.classList.remove("character-stage-cg");
+    elements.characterPortrait.classList.remove("character-portrait-cg");
     elements.characterName.textContent = getTranslation().noCharacterSelected;
     return;
   }
 
   const expression = getSelectedCharacterExpression(character);
-  elements.characterPortrait.src = expression?.image || character.avatar;
-  elements.characterPortrait.alt = `${getCharacterName(character)} ${expression?.name || "character"} pose`;
+  const cg = getSelectedCharacterCg(character);
+  const visual = cg || expression;
+  elements.appShell.classList.toggle("character-cg-active", Boolean(cg));
+  elements.characterStage.classList.toggle("character-stage-cg", Boolean(cg));
+  elements.characterPortrait.classList.toggle("character-portrait-cg", Boolean(cg));
+  elements.characterPortrait.src = visual?.image || character.avatar;
+  elements.characterPortrait.alt = `${getCharacterName(character)} ${visual?.name || "character"} ${cg ? "CG" : "pose"}`;
   elements.characterName.textContent = getCharacterName(character);
 }
 
@@ -2557,10 +2668,12 @@ function buildFullSystemPrompt() {
   const notes = getSelectedCharacterNotes();
   const characterPrompt = getSelectedCharacterPrompt();
   const expressionNames = getSelectedCharacterExpressions().map((expression) => expression.name);
+  const cgNames = getSelectedCharacterCgs().map((cg) => cg.name);
 
   return [
     buildRoleplaySection(characterName),
     buildExpressionSection(expressionNames),
+    buildCgSection(cgNames),
     buildLanguageInstruction(),
     characterPrompt ? `Character prompt:\n${characterPrompt}` : "",
     notes.relationship ? `Relationship with the user:\n${notes.relationship.trim()}` : ""
@@ -2585,6 +2698,14 @@ function buildExpressionSection(expressionNames) {
   }
 
   return `Expression sheet available: ${expressionNames.join(", ")}.\nThese expressions control your visible character sprite. Use them as the story and emotion progress: choose the expression that best matches your current mood, reaction, tone, or physical state in the scene. Change expressions when the emotional beat changes instead of staying on one expression by default.\nAt the very start of every reply, write exactly one line in this format: Expression: <exact English expression name from the sheet>. Use exactly one expression line per reply. Do not write any other Expression or Emotion labels later in the reply. The expression value must stay in English exactly as written in the sheet even when the dialogue language is Chinese. Then write the in-character reply on the following lines.`;
+}
+
+function buildCgSection(cgNames) {
+  if (!Array.isArray(cgNames) || cgNames.length === 0) {
+    return "";
+  }
+
+  return `CG sheet available: ${cgNames.join(", ")}.\nThese CGs are special scene images named by their situation. When the atmosphere is romantic, intimate, or erotic enough for one of these scenes, add exactly one optional line after the Expression line in this format: CG: <exact English CG name from the sheet>. Only use a CG when it naturally fits the current mood and action; otherwise omit the CG line. Use CG: None when the scene should return to the normal expression sprite. The CG value must stay in English exactly as written in the sheet even when the dialogue language is Chinese.`;
 }
 
 function buildRoleplayGuidelines(characterName, userName) {
@@ -2760,6 +2881,10 @@ function getSelectedCharacterExpressions() {
   return getSelectedCharacter()?.expressions || [];
 }
 
+function getSelectedCharacterCgs() {
+  return getSelectedCharacter()?.cgs || [];
+}
+
 function getSelectedCharacterExpression(character = getSelectedCharacter()) {
   if (!character) {
     return null;
@@ -2790,6 +2915,61 @@ function setCharacterExpression(characterId, expressionName) {
   return true;
 }
 
+function getSelectedCharacterCg(character = getSelectedCharacter()) {
+  if (!character) {
+    return null;
+  }
+
+  const cgId = state.characterCgs[character.id] || "";
+  return (character.cgs || []).find((cg) => cg.id === cgId) || null;
+}
+
+function setCharacterCg(characterId, cgName, { unlock = false, requireUnlocked = false } = {}) {
+  const character = state.characters.find((entry) => entry.id === characterId);
+  if (!character) {
+    return;
+  }
+
+  if (!cgName || normalizeVisualName(cgName) === "none") {
+    delete state.characterCgs[characterId];
+    renderCharacter();
+    return true;
+  }
+
+  const normalizedName = normalizeVisualName(cgName);
+  const cg = (character.cgs || []).find((entry) => normalizeVisualName(entry.name) === normalizedName);
+  if (!cg) {
+    return false;
+  }
+
+  if (unlock) {
+    unlockCharacterCg(characterId, cg.id);
+  } else if (requireUnlocked && !isCharacterCgUnlocked(characterId, cg.id)) {
+    return false;
+  }
+
+  state.characterCgs[characterId] = cg.id;
+  renderCharacter();
+  renderCharacterCgStrip();
+  return true;
+}
+
+function unlockCharacterCg(characterId, cgId) {
+  if (!characterId || !cgId) {
+    return;
+  }
+
+  if (!isPlainObject(state.unlockedCharacterCgs[characterId])) {
+    state.unlockedCharacterCgs[characterId] = {};
+  }
+
+  state.unlockedCharacterCgs[characterId][cgId] = true;
+}
+
+function isCharacterCgUnlocked(characterId, cgId) {
+  return Boolean(characterId && cgId && state.unlockedCharacterCgs[characterId]?.[cgId]);
+}
+
 function applyExpressionCommands(text) {
   let changed = false;
   let nextText = String(text || "");
@@ -2812,22 +2992,26 @@ function applyExpressionCommands(text) {
   };
 }
 
-function parseExpressionReply(reply) {
+function parseVisualReply(reply) {
   const text = String(reply || "").trim();
-  const expressions = getSelectedCharacterExpressions();
-  if (!text || expressions.length === 0) {
-    return { expression: "", text };
+  if (!text) {
+    return { expression: "", cg: "", hasCg: false, text };
   }
 
   const tags = findExpressionTags(text);
   const recognizedTags = tags.filter((tag) => tag.expression);
-  if (tags.length === 0) {
-    return { expression: "", text };
-  }
+  const cgTags = findCgTags(text);
+  const recognizedCgTags = cgTags.filter((tag) => tag.hasCg);
+  const matches = [
+    ...tags.map((tag) => tag.match),
+    ...cgTags.map((tag) => tag.match)
+  ];
 
   return {
     expression: recognizedTags.at(-1)?.expression || "",
-    text: removeExpressionTags(text, tags.map((tag) => tag.match)).trim()
+    cg: recognizedCgTags.at(-1)?.cg || "",
+    hasCg: recognizedCgTags.length > 0,
+    text: removeVisualTags(text, matches).trim()
   };
 }
 
@@ -2850,16 +3034,43 @@ function findExpressionTags(text) {
 }
 
 function findKnownExpressionName(value) {
-  const normalizedValue = normalizeExpressionName(value);
+  const normalizedValue = normalizeVisualName(value);
   const translatedValue = CHINESE_EXPRESSION_ALIASES[normalizedValue] || "";
   const expression = getSelectedCharacterExpressions().find((entry) => {
-    const normalizedName = normalizeExpressionName(entry.name);
+    const normalizedName = normalizeVisualName(entry.name);
     return normalizedName === normalizedValue || normalizedName === translatedValue;
   });
   return expression?.name || "";
 }
 
-function removeExpressionTags(text, matches) {
+function findCgTags(text) {
+  const tagPattern = /\[\s*cg\s*:?\s*([^\]]+?)\s*\]|cg\s*\[\s*([^\]]+?)\s*\]|^\s*cg\s*:\s*([^\n\r.!?，。！？]+)/gim;
+  const tags = [];
+
+  for (const match of text.matchAll(tagPattern)) {
+    const value = match[1] || match[2] || match[3] || "";
+    const cg = findKnownCgName(value);
+    const isNone = normalizeVisualName(value) === "none";
+    tags.push({
+      cg: isNone ? "" : cg,
+      hasCg: isNone || Boolean(cg),
+      match: {
+        index: match.index,
+        text: match[0]
+      }
+    });
+  }
+
+  return tags.sort((a, b) => a.match.index - b.match.index);
+}
+
+function findKnownCgName(value) {
+  const normalizedValue = normalizeVisualName(value);
+  const cg = getSelectedCharacterCgs().find((entry) => normalizeVisualName(entry.name) === normalizedValue);
+  return cg?.name || "";
+}
+
+function removeVisualTags(text, matches) {
   let nextText = text;
   for (const match of [...matches].sort((a, b) => b.index - a.index)) {
     nextText = `${nextText.slice(0, match.index)}${nextText.slice(match.index + match.text.length)}`;
@@ -2872,7 +3083,15 @@ function removeExpressionTags(text, matches) {
 }
 
 function normalizeExpressionName(name) {
+  return normalizeVisualName(name);
+}
+
+function normalizeVisualName(name) {
   return String(name || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function formatCgName(name) {
+  return String(name || "").replace(/[_-]+/g, " ");
 }
 
 function getCharacterDisplayName() {
@@ -2993,6 +3212,8 @@ function createStateSnapshot() {
     theme: state.theme,
     characterNotes: state.characterNotes,
     characterExpressions: state.characterExpressions,
+    characterCgs: state.characterCgs,
+    unlockedCharacterCgs: state.unlockedCharacterCgs,
     characterConversations: state.characterConversations,
     historyTitles: state.historyTitles,
   storyConversations: state.storyConversations,
@@ -3044,6 +3265,9 @@ function applyPersistedState(parsed) {
   state.theme = parsed.theme === "night" ? "night" : "day";
   state.characterNotes = isPlainObject(parsed.characterNotes) ? parsed.characterNotes : {};
   state.characterExpressions = isPlainObject(parsed.characterExpressions) ? parsed.characterExpressions : {};
+  state.characterCgs = isPlainObject(parsed.characterCgs) ? parsed.characterCgs : {};
+  state.unlockedCharacterCgs = isPlainObject(parsed.unlockedCharacterCgs) ? parsed.unlockedCharacterCgs : {};
+  migrateSelectedCgsToUnlocked();
   state.characterConversations = isPlainObject(parsed.characterConversations) ? parsed.characterConversations : {};
   state.historyTitles = isPlainObject(parsed.historyTitles) ? parsed.historyTitles : {};
   state.storyConversations = isPlainObject(parsed.storyConversations) ? parsed.storyConversations : {};
@@ -3071,6 +3295,14 @@ function applyPersistedState(parsed) {
   state.view = ["conversation", "story", "minigame"].includes(parsed.view) ? parsed.view : "menu";
   state.toolbarHidden = Boolean(parsed.toolbarHidden);
   state.storyToolbarHidden = Boolean(parsed.storyToolbarHidden);
+}
+
+function migrateSelectedCgsToUnlocked() {
+  for (const [characterId, cgId] of Object.entries(state.characterCgs)) {
+    if (typeof cgId === "string" && cgId) {
+      unlockCharacterCg(characterId, cgId);
+    }
+  }
 }
 
 function isPlainObject(value) {
