@@ -85,6 +85,23 @@
         </section>
       </div>
 
+      <div id="memberThanksOverlay" class="modal-overlay member-thanks-overlay" hidden>
+        <section class="modal-panel modal-panel-narrow member-thanks-panel" role="dialog" aria-modal="true" aria-labelledby="memberThanksTitle">
+          <header class="modal-header">
+            <h2 id="memberThanksTitle" data-i18n="memberThanksTitle">Thank you for joining</h2>
+          </header>
+
+          <p class="modal-body-text" data-i18n="memberThanksMessage">
+            Here is the Discord you can use to message me if you meet any bugs or want improvements.
+          </p>
+
+          <div class="member-thanks-actions">
+            <a class="button discord-link-button" href="https://discord.gg/nC5P8p2SdX" target="_blank" rel="noopener noreferrer">Discord</a>
+            <button id="memberThanksCloseButton" class="button button-ghost" type="button" data-i18n="closeButton">Close</button>
+          </div>
+        </section>
+      </div>
+
       <aside class="menu-panel" aria-label="Menu">
         <header class="menu-header">
           <div>
@@ -171,6 +188,11 @@
                 <button class="theme-option" type="button" data-language-value="chinese" data-i18n="languageChinese">中文</button>
               </div>
             </label>
+
+            <div class="settings-link-block">
+              <span data-i18n="discordLabel">Discord</span>
+              <a class="button discord-link-button" href="https://discord.gg/nC5P8p2SdX" target="_blank" rel="noopener noreferrer">Discord</a>
+            </div>
           </div>
         </section>
       </div>

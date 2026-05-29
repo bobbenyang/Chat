@@ -50,6 +50,9 @@ const TRANSLATIONS = {
     supportGateMessage: "Free users can try 10 messages. Become a member on one of the sites below to receive an account.",
     guestIntroTrialTitle: "Welcome",
     guestIntroTrialMessage: "You can send 10 free messages before logging in. This site uses local browser storage/cookies to count how many messages you send. By clicking Continue, you accept these conditions.",
+    memberThanksTitle: "Thank you for joining",
+    memberThanksMessage: "Here is the Discord you can use to message me if you meet any bugs or want improvements.",
+    discordLabel: "Discord",
     loginTitle: "Login",
     usernameLabel: "Username",
     passwordLabel: "Password",
@@ -153,6 +156,9 @@ const TRANSLATIONS = {
     supportGateMessage: "免费用户可以试用 10 条消息。请在下方任一网站成为会员，以获得账号。",
     guestIntroTrialTitle: "欢迎",
     guestIntroTrialMessage: "登录前你可以免费发送 10 条消息。本站会使用浏览器本地存储/Cookie 来统计你发送了多少条消息。点击继续即表示你接受这些条件。",
+    memberThanksTitle: "感谢加入",
+    memberThanksMessage: "如果你遇到任何问题，或想提出改进建议，可以通过这个 Discord 联系我。",
+    discordLabel: "Discord",
     loginTitle: "登录",
     usernameLabel: "用户名",
     passwordLabel: "密码",
@@ -249,6 +255,8 @@ const elements = {
   guestIntroLanguageStep: document.querySelector("#guestIntroLanguageStep"),
   guestIntroTrialStep: document.querySelector("#guestIntroTrialStep"),
   guestIntroContinueButton: document.querySelector("#guestIntroContinueButton"),
+  memberThanksOverlay: document.querySelector("#memberThanksOverlay"),
+  memberThanksCloseButton: document.querySelector("#memberThanksCloseButton"),
   menuEyebrow: document.querySelector("#menuEyebrow"),
   characterGrid: document.querySelector("#characterGrid"),
   storyGrid: document.querySelector("#storyGrid"),
@@ -402,6 +410,7 @@ const state = {
   guestIntroOpen: false,
   guestIntroStep: "language",
   guestIntroSeen: false,
+  memberThanksOpen: false,
   menuPage: "characters",
   editingCharacterId: "",
   editingHistoryCharacterId: "",
@@ -459,6 +468,7 @@ function bindEvents() {
   elements.supportGateLoginButton.addEventListener("click", openLoginFromSupportGate);
   elements.guestIntroLanguageStep.addEventListener("click", handleGuestIntroLanguageClick);
   elements.guestIntroContinueButton.addEventListener("click", closeGuestIntro);
+  elements.memberThanksCloseButton.addEventListener("click", closeMemberThanks);
   elements.languageToggle.addEventListener("click", (event) => {
     const button = event.target.closest("[data-language-value]");
     if (!button) {
@@ -697,8 +707,10 @@ async function login(event) {
     state.authenticated = true;
     state.username = payload.username || elements.loginUsername.value;
     state.loginOpen = false;
+    state.supportGateOpen = false;
+    state.memberThanksOpen = true;
     elements.loginPassword.value = "";
-    renderAuth();
+    render();
     await connectToNovelAi();
   } catch (error) {
     elements.loginError.textContent = error.message || getTranslation().loginFailed;
@@ -1067,6 +1079,7 @@ function render() {
   renderAuth();
   renderGuestIntro();
   renderSupportGate();
+  renderMemberThanks();
 }
 
 function applyTranslations() {
@@ -1237,6 +1250,18 @@ function openLoginFromSupportGate() {
 
   state.supportGateOpen = false;
   renderSupportGate();
+}
+
+function renderMemberThanks() {
+  elements.memberThanksOverlay.hidden = !state.memberThanksOpen;
+  if (state.memberThanksOpen) {
+    elements.memberThanksCloseButton.focus();
+  }
+}
+
+function closeMemberThanks() {
+  state.memberThanksOpen = false;
+  renderMemberThanks();
 }
 
 function getFreeUserMessageCount() {

@@ -538,11 +538,16 @@ textarea {
   z-index: 95;
 }
 
+.member-thanks-overlay {
+  z-index: 100;
+}
+
 .auth-panel {
   grid-template-rows: auto auto auto;
 }
 
 .guest-intro-panel,
+.member-thanks-panel,
 .support-gate-panel {
   grid-template-rows: auto auto auto;
 }
@@ -581,6 +586,34 @@ textarea {
 .support-link-patreon,
 .support-link-unifans {
   background: #f28c45;
+}
+
+.member-thanks-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.discord-link-button {
+  display: grid;
+  place-items: center;
+  color: #fffaf1;
+  background: var(--accent);
+  text-align: center;
+  text-decoration: none;
+}
+
+.settings-link-block {
+  display: grid;
+  gap: 0.4rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+}
+
+.settings-link-block > span {
+  font-size: calc(var(--ui-font-size) * 0.78);
+  font-weight: 800;
+  opacity: 0.76;
 }
 
 .auth-error {
