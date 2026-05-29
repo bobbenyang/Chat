@@ -308,6 +308,18 @@ textarea {
   filter: brightness(0) invert(1);
 }
 
+.theme-night .menu-page-option:not(.is-active) .button-icon,
+.theme-night .button-ghost.icon-button .button-icon,
+.theme-night .history-rename-button .button-icon,
+.theme-night .character-settings-button .button-icon {
+  filter: brightness(0) invert(1);
+}
+
+.theme-night .menu-page-option.is-active .button-icon,
+.theme-night .menu-settings-button .button-icon {
+  filter: none;
+}
+
 .icon-button {
   display: inline-grid;
   place-items: center;
@@ -479,6 +491,7 @@ textarea {
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: var(--ui-font-size);
+  overflow: hidden;
 }
 
 .modal-panel-narrow {
@@ -492,10 +505,12 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
@@ -515,8 +530,57 @@ textarea {
   z-index: 80;
 }
 
+.support-gate-overlay {
+  z-index: 90;
+}
+
+.guest-intro-overlay {
+  z-index: 95;
+}
+
 .auth-panel {
   grid-template-rows: auto auto auto;
+}
+
+.guest-intro-panel,
+.support-gate-panel {
+  grid-template-rows: auto auto auto;
+}
+
+.guest-intro-step {
+  display: grid;
+  gap: 1rem;
+}
+
+.guest-language-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.support-gate-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.support-link-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.support-link-button {
+  display: grid;
+  place-items: center;
+  color: #fffaf1;
+  text-align: center;
+  text-decoration: none;
+}
+
+.support-link-patreon,
+.support-link-unifans {
+  background: #f28c45;
 }
 
 .auth-error {
@@ -530,13 +594,11 @@ textarea {
   padding: 0 0.1rem 0.1rem;
 }
 
-#characterSettingsModal .settings-stack {
-  overflow-y: auto;
-  padding-right: 0.3rem;
-}
-
+#menuSettingsModal .settings-stack,
+#characterSettingsModal .settings-stack,
 #conversationSettingsModal .settings-stack,
-#historySettingsModal .settings-stack {
+#historySettingsModal .settings-stack,
+#storySettingsModal .settings-stack {
   overflow-y: auto;
   padding-right: 0.3rem;
 }
@@ -890,9 +952,10 @@ textarea:focus {
   object-position: top center;
   filter: none;
   transform: none;
+  border: 4px solid #000;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: 0 0 0 4px #fff;
 }
 
 .dialogue-form {

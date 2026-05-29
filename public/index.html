@@ -34,6 +34,57 @@
         </form>
       </div>
 
+      <div id="supportGateOverlay" class="modal-overlay support-gate-overlay" hidden>
+        <section class="modal-panel modal-panel-narrow support-gate-panel" role="dialog" aria-modal="true" aria-labelledby="supportGateTitle">
+          <header class="modal-header">
+            <h2 id="supportGateTitle" data-i18n="supportGateTitle">Continue chatting</h2>
+          </header>
+
+          <p id="supportGateMessage" class="modal-body-text" data-i18n="supportGateMessage">
+            Free users can try 10 messages. Become a member on one of the sites below to receive an account.
+          </p>
+
+          <div class="support-gate-actions">
+            <button id="supportGateLoginButton" class="button button-primary" type="button" data-i18n="loginButton">Log in</button>
+            <div class="support-link-row">
+              <a class="button support-link-button support-link-patreon" href="https://www.patreon.com/c/ShiHuShiFu/membership" target="_blank" rel="noopener noreferrer">Patreon</a>
+              <a class="button support-link-button support-link-unifans" href="https://app.unifans.io/c/shihushifu" target="_blank" rel="noopener noreferrer">Unifans</a>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="guestIntroOverlay" class="modal-overlay guest-intro-overlay" hidden>
+        <section class="modal-panel modal-panel-narrow guest-intro-panel" role="dialog" aria-modal="true" aria-labelledby="guestIntroTitle">
+          <div id="guestIntroLanguageStep" class="guest-intro-step">
+            <header class="modal-header">
+              <h2 id="guestIntroTitle">Language / 语言</h2>
+            </header>
+
+            <p class="modal-body-text">What language do you speak? / 请选择语言。</p>
+
+            <div class="guest-language-actions">
+              <button class="button button-primary" type="button" data-guest-language="english">English</button>
+              <button class="button button-primary" type="button" data-guest-language="chinese">中文</button>
+            </div>
+          </div>
+
+          <div id="guestIntroTrialStep" class="guest-intro-step" hidden>
+            <header class="modal-header">
+              <h2 data-i18n="guestIntroTrialTitle">Welcome</h2>
+            </header>
+
+            <p class="modal-body-text" data-i18n="guestIntroTrialMessage">
+              You can send 10 free messages before logging in.
+            </p>
+
+            <footer class="modal-footer">
+              <button id="guestIntroContinueButton" class="button button-primary" type="button" data-i18n="startButton">Start</button>
+            </footer>
+          </div>
+        </section>
+      </div>
+
       <aside class="menu-panel" aria-label="Menu">
         <header class="menu-header">
           <div>

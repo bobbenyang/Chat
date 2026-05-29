@@ -3,6 +3,8 @@ const HISTORY_EXPORT_VERSION = 2;
 const WAITING_FRAMES = [".", "..", "..."];
 const WAITING_FRAME_MS = 420;
 const MAX_CONTEXT_MESSAGES = 24;
+const FREE_MESSAGE_LIMIT = 10;
+const SUPPORT_GATE_TEST_MODE = false;
 const CHINESE_EXPRESSION_ALIASES = {
   "普通": "normal",
   "正常": "normal",
@@ -44,6 +46,10 @@ const TRANSLATIONS = {
     storyReturnToGameButton: "Return to Game",
     storyEndingButton: "Ending Reached",
     storyDialogueAriaLabel: "Story dialogue",
+    supportGateTitle: "Continue chatting",
+    supportGateMessage: "Free users can try 10 messages. Become a member on one of the sites below to receive an account.",
+    guestIntroTrialTitle: "Welcome",
+    guestIntroTrialMessage: "You can send 10 free messages before logging in.",
     loginTitle: "Login",
     usernameLabel: "Username",
     passwordLabel: "Password",
@@ -143,6 +149,10 @@ const TRANSLATIONS = {
     storyReturnToGameButton: "返回游戏",
     storyEndingButton: "已到达结局",
     storyDialogueAriaLabel: "故事对话",
+    supportGateTitle: "继续聊天",
+    supportGateMessage: "免费用户可以试用 10 条消息。请在下方任一网站成为会员，以获得账号。",
+    guestIntroTrialTitle: "欢迎",
+    guestIntroTrialMessage: "登录前你可以免费发送 10 条消息。",
     loginTitle: "登录",
     usernameLabel: "用户名",
     passwordLabel: "密码",
@@ -232,6 +242,13 @@ const elements = {
   loginPassword: document.querySelector("#loginPassword"),
   loginError: document.querySelector("#loginError"),
   loginButton: document.querySelector("#loginButton"),
+  supportGateOverlay: document.querySelector("#supportGateOverlay"),
+  supportGateMessage: document.querySelector("#supportGateMessage"),
+  supportGateLoginButton: document.querySelector("#supportGateLoginButton"),
+  guestIntroOverlay: document.querySelector("#guestIntroOverlay"),
+  guestIntroLanguageStep: document.querySelector("#guestIntroLanguageStep"),
+  guestIntroTrialStep: document.querySelector("#guestIntroTrialStep"),
+  guestIntroContinueButton: document.querySelector("#guestIntroContinueButton"),
   menuEyebrow: document.querySelector("#menuEyebrow"),
   characterGrid: document.querySelector("#characterGrid"),
   storyGrid: document.querySelector("#storyGrid"),
@@ -381,12 +398,17 @@ const state = {
   authEnabled: false,
   authenticated: false,
   username: "",
+  loginOpen: false,
+  guestIntroOpen: false,
+  guestIntroStep: "language",
+  guestIntroSeen: false,
   menuPage: "characters",
   editingCharacterId: "",
   editingHistoryCharacterId: "",
   view: "menu",
   toolbarHidden: false,
   storyToolbarHidden: false,
+  supportGateOpen: false,
   busy: false
 };
 
@@ -405,9 +427,10 @@ async function bootstrap() {
   await loadPersistedStory();
   await refreshAuthStatus();
   render();
-  if (state.authenticated || !state.authEnabled) {
-    await connectToNovelAi();
+  if (!maybeOpenGuestIntro()) {
+    maybeOpenSupportGate();
   }
+  await connectToNovelAi();
 }
 
 async function loadPersistedStory() {
@@ -433,6 +456,9 @@ async function loadPersistedStory() {
 
 function bindEvents() {
   elements.loginForm.addEventListener("submit", login);
+  elements.supportGateLoginButton.addEventListener("click", openLoginFromSupportGate);
+  elements.guestIntroLanguageStep.addEventListener("click", handleGuestIntroLanguageClick);
+  elements.guestIntroContinueButton.addEventListener("click", closeGuestIntro);
   elements.languageToggle.addEventListener("click", (event) => {
     const button = event.target.closest("[data-language-value]");
     if (!button) {
@@ -670,6 +696,7 @@ async function login(event) {
     });
     state.authenticated = true;
     state.username = payload.username || elements.loginUsername.value;
+    state.loginOpen = false;
     elements.loginPassword.value = "";
     renderAuth();
     await connectToNovelAi();
@@ -739,6 +766,10 @@ async function sendMessage(event) {
     return;
   }
 
+  if (maybeOpenSupportGate()) {
+    return;
+  }
+
   if (state.models.length === 0) {
     updateStatus(getTranslation().statusNeedConnect);
     return;
@@ -800,6 +831,7 @@ async function sendMessage(event) {
     updateStatus(getTranslation().statusGeneratedChat);
     persistState();
     renderDialogue({ scrollToEnd: true });
+    maybeOpenSupportGate();
   } catch (error) {
     stopWaitingAnimation({ clearText: true });
     conversation.pendingAssistantText = "";
@@ -807,6 +839,7 @@ async function sendMessage(event) {
     updateStatus(error.message || getTranslation().statusMessageFailed);
     persistState();
     renderDialogue({ scrollToEnd: true });
+    maybeOpenSupportGate();
   }
 }
 
@@ -1032,6 +1065,8 @@ function render() {
   renderToolbar();
   renderStoryToolbar();
   renderAuth();
+  renderGuestIntro();
+  renderSupportGate();
 }
 
 function applyTranslations() {
@@ -1110,11 +1145,109 @@ function updateReplyLength(value) {
 }
 
 function renderAuth() {
-  const shouldLogin = state.authEnabled && !state.authenticated;
+  const shouldLogin = state.loginOpen && state.authEnabled && !state.authenticated;
   elements.loginOverlay.hidden = !shouldLogin;
   if (shouldLogin) {
     elements.loginUsername.focus();
   }
+}
+
+function maybeOpenGuestIntro() {
+  if (!state.authEnabled || state.authenticated || state.guestIntroSeen) {
+    state.guestIntroOpen = false;
+    return false;
+  }
+
+  state.guestIntroOpen = true;
+  state.guestIntroStep = state.guestIntroStep === "trial" ? "trial" : "language";
+  renderGuestIntro();
+  return true;
+}
+
+function renderGuestIntro() {
+  elements.guestIntroOverlay.hidden = !state.guestIntroOpen;
+  elements.guestIntroLanguageStep.hidden = state.guestIntroStep !== "language";
+  elements.guestIntroTrialStep.hidden = state.guestIntroStep !== "trial";
+
+  if (!state.guestIntroOpen) {
+    return;
+  }
+
+  if (state.guestIntroStep === "trial") {
+    elements.guestIntroContinueButton.focus();
+  } else {
+    elements.guestIntroLanguageStep.querySelector("[data-guest-language]")?.focus();
+  }
+}
+
+function handleGuestIntroLanguageClick(event) {
+  const button = event.target.closest("[data-guest-language]");
+  if (!button) {
+    return;
+  }
+
+  state.responseLanguage = button.dataset.guestLanguage === "chinese" ? "chinese" : "english";
+  state.guestIntroStep = "trial";
+  persistState();
+  render();
+}
+
+function closeGuestIntro() {
+  state.guestIntroOpen = false;
+  state.guestIntroSeen = true;
+  persistState();
+  render();
+  maybeOpenSupportGate();
+}
+
+function maybeOpenSupportGate() {
+  if (state.guestIntroOpen) {
+    return false;
+  }
+
+  if (state.authenticated) {
+    state.supportGateOpen = false;
+    return false;
+  }
+
+  if (SUPPORT_GATE_TEST_MODE || getFreeUserMessageCount() >= FREE_MESSAGE_LIMIT) {
+    state.supportGateOpen = true;
+    renderSupportGate();
+    return true;
+  }
+
+  return false;
+}
+
+function renderSupportGate() {
+  elements.supportGateOverlay.hidden = !state.supportGateOpen;
+  if (state.supportGateOpen) {
+    elements.supportGateLoginButton.focus();
+  }
+}
+
+function openLoginFromSupportGate() {
+  if (state.authEnabled && !state.authenticated) {
+    state.supportGateOpen = false;
+    state.loginOpen = true;
+    renderSupportGate();
+    renderAuth();
+    return;
+  }
+
+  state.supportGateOpen = false;
+  renderSupportGate();
+}
+
+function getFreeUserMessageCount() {
+  const characterMessages = Object.values(state.characterConversations)
+    .flatMap((conversation) => Array.isArray(conversation?.messages) ? conversation.messages : []);
+  const storyMessages = Object.values(state.storyConversations)
+    .flatMap((conversation) => Array.isArray(conversation?.messages) ? conversation.messages : []);
+
+  return [...characterMessages, ...storyMessages]
+    .filter((message) => message?.role === "user")
+    .length;
 }
 
 function renderBackgroundStrip() {
@@ -1977,6 +2110,10 @@ async function sendStoryMessage(event) {
     return;
   }
 
+  if (maybeOpenSupportGate()) {
+    return;
+  }
+
   if (state.models.length === 0) {
     updateStatus(getTranslation().statusNeedConnect);
     return;
@@ -2017,12 +2154,14 @@ async function sendStoryMessage(event) {
     setBusy(false);
     persistState();
     renderStoryDialogue({ scrollToEnd: true });
+    maybeOpenSupportGate();
   } catch (error) {
     conversation.pendingAssistantText = "";
     setBusy(false);
     updateStatus(error.message || getTranslation().statusMessageFailed);
     persistState();
     renderStoryDialogue({ scrollToEnd: true });
+    maybeOpenSupportGate();
   }
 }
 
@@ -2035,6 +2174,10 @@ async function sendStoryBubbleMessage(event) {
   const conversation = getSelectedStoryConversation();
   const content = elements.storyBubbleInput.value.trim();
   if (!content || state.busy) {
+    return;
+  }
+
+  if (maybeOpenSupportGate()) {
     return;
   }
 
@@ -2079,12 +2222,14 @@ async function sendStoryBubbleMessage(event) {
     setBusy(false);
     persistState();
     renderStoryBubbles({ scrollToEnd: true });
+    maybeOpenSupportGate();
   } catch (error) {
     conversation.pendingAssistantText = "";
     setBusy(false);
     updateStatus(error.message || getTranslation().statusMessageFailed);
     persistState();
     renderStoryBubbles({ scrollToEnd: true });
+    maybeOpenSupportGate();
   }
 }
 
@@ -3216,13 +3361,14 @@ function createStateSnapshot() {
     unlockedCharacterCgs: state.unlockedCharacterCgs,
     characterConversations: state.characterConversations,
     historyTitles: state.historyTitles,
-  storyConversations: state.storyConversations,
-  selectedStoryId: state.selectedStoryId,
-  selectedStoryCgId: state.selectedStoryCgId,
-  storyScores: state.storyScores,
-  storyCgPickerOpen: state.storyCgPickerOpen,
-  customizeCharacterId: state.customizeCharacterId,
-  menuPage: state.menuPage,
+    storyConversations: state.storyConversations,
+    selectedStoryId: state.selectedStoryId,
+    selectedStoryCgId: state.selectedStoryCgId,
+    storyScores: state.storyScores,
+    storyCgPickerOpen: state.storyCgPickerOpen,
+    customizeCharacterId: state.customizeCharacterId,
+    guestIntroSeen: state.guestIntroSeen,
+    menuPage: state.menuPage,
     view: state.view,
     toolbarHidden: state.toolbarHidden,
     storyToolbarHidden: state.storyToolbarHidden
@@ -3276,6 +3422,7 @@ function applyPersistedState(parsed) {
   state.storyScores = isPlainObject(parsed.storyScores) ? parsed.storyScores : {};
   state.storyCgPickerOpen = Boolean(parsed.storyCgPickerOpen);
   state.customizeCharacterId = typeof parsed.customizeCharacterId === "string" ? parsed.customizeCharacterId : "";
+  state.guestIntroSeen = Boolean(parsed.guestIntroSeen);
   state.menuPage = ["stories", "history"].includes(parsed.menuPage) ? parsed.menuPage : "characters";
 
   if (Array.isArray(parsed.messages) || typeof parsed.draft === "string") {

@@ -81,13 +81,11 @@ createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/models" && req.method === "POST") {
-      requireAuth(req);
       const models = await fetchModels();
       return sendJson(res, 200, { models });
     }
 
     if (url.pathname === "/api/test" && req.method === "POST") {
-      requireAuth(req);
       const models = await fetchModels();
       return sendJson(res, 200, {
         ok: true,
@@ -97,14 +95,13 @@ createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/status" && req.method === "GET") {
-      requireAuth(req);
       return sendJson(res, 200, {
         hasGlmKey: Boolean(getGlmApiKey({ throwIfMissing: false }))
       });
     }
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
-      const session = requireAuth(req);
+      const session = getAuthSession(req) || { username: "guest" };
       const body = await readJsonBody(req);
       validateChatRequest(body);
       logRequest(req, "chat", {
