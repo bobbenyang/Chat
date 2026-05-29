@@ -588,6 +588,19 @@ textarea {
   background: #f28c45;
 }
 
+.support-gate-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: calc(var(--ui-font-size) * 0.86);
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.support-gate-note:empty {
+  display: none;
+}
+
 .member-thanks-actions {
   display: grid;
   grid-template-columns: 1fr;
