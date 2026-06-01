@@ -1317,9 +1317,8 @@ function renderCharacterCgStrip() {
   }
 
   const cgs = character.cgs || [];
-  const hasUnlockedCgs = cgs.some((cg) => isCharacterCgUnlocked(character.id, cg.id));
-  elements.characterCgStrip.closest(".field").hidden = cgs.length === 0 || !hasUnlockedCgs;
-  if (cgs.length === 0 || !hasUnlockedCgs) {
+  elements.characterCgStrip.closest(".field").hidden = cgs.length === 0;
+  if (cgs.length === 0) {
     return;
   }
 
