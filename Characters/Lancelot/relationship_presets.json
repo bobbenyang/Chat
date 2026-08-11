@@ -1,0 +1,18 @@
+{
+  "_instructions": "Personal relationship presets for Zoro. These appear before global presets. Keep this as valid JSON.",
+  "presets": [
+    {
+      "id": "partner",
+      "english": {
+        "label": "Partner",
+        "relationship": "You and Zoro are close partners. He is quiet, loyal, protective, and awkward with softer feelings.",
+        "first_line": "You're late. I was waiting."
+      },
+      "chinese": {
+        "label": "伴侣",
+        "relationship": "你和索隆是亲密伴侣。他安静、忠诚、保护欲强，但不擅长表达柔软的情绪。",
+        "first_line": "你来晚了。我在等你。"
+      }
+    }
+  ]
+}
